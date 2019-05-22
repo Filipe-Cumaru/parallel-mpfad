@@ -40,17 +40,15 @@ using namespace std;
 using namespace moab;
 
 // Enumeration created to make the access to tags more readable.
-enum TagsID {global_id, permeability, centroid, dirichlet, neumann};
+enum TagsID {global_id, permeability, centroid, dirichlet,
+                neumann, source, pressure};
 
 class MPFADSolver {
 private:
     Interface *mb;
     MeshTopoUtil *topo_util;
     ParallelComm *pcomm;
-    string perm_tag_name;
-    // string centroid_tag_name;
-    // string dirichlet_tag_name;
-    // string neumann_tag_name;
+    Tag tags[7];
 public:
     MPFADSolver ();
     MPFADSolver (Interface *moab_interface);

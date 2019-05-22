@@ -5,13 +5,11 @@ using namespace moab;
 
 MPFADSolver::MPFADSolver () : mb(new Core()),
                             pcomm(mb, MPI_COMM_WORLD),
-                            topo_util(new MeshTopoUtil(mb)),
-                            perm_tag_name("PERMEABILITY") {}
+                            topo_util(new MeshTopoUtil(mb)) {}
 
 MPFADSolver::MPFADSolver (Interface* moab_interface) : mb(moab_interface),
                                                 pcomm(mb, MPI_COMM_WORLD),
-                                                topo_util(new MeshTopoUtil(mb)),
-                                                perm_tag_name("PERMEABILITY") {}
+                                                topo_util(new MeshTopoUtil(mb)) {}
 
 void MPFADSolver::run () {
     /*
@@ -34,6 +32,7 @@ void MPFADSolver::run () {
     if (rval != MB_SUCCESS) {
         throw runtime_error("Could not retrieve volumes from the mesh.\n");
     }
+    // NOTE: Check how many layers need to be exchanged in a MPFA-D scheme.
     rval = this->pcomm->exchange_ghost_cells(GHOST_DIM, BRIDGE_DIM, 1, 0, true);
     if (rval != MB_SUCCESS) {
         throw runtime_error("exchange_ghost_cells failed\n");
