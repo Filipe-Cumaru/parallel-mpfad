@@ -43,12 +43,7 @@ void MPFADSolver::run () {
     MPI_Allreduce(&num_local_elems, &num_global_elems, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     printf("<%d> # global elems: %d\tlocal elems = %d\n", rank, num_global_elems, num_local_elems);
 
-    // Get tags on elements and exchange those from shared elements.
-
-    // REVIEW: Check how the properties are assigned in the MPFA mesh.
-    Tag tag_handles[5];
-    printf("<%d> Setting tags...\n", rank);
-    this->setup_tags(tag_handles);
+    this->init_tags();
 
     int* gids = (int*) calloc(volumes.size(), sizeof(int));
     if (gids == NULL) {
@@ -139,4 +134,17 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
 
 void MPFADSolver::set_pressure_tags (Epetra_Vector& X, Range& volumes) {
 
+}
+
+void MPFADSolver::init_tags () {
+    // TODO: Check how to exchange tags for nodes and faces. Review ghost cell
+    // exchange in run method.
+    ErrorCode rval;
+
+    rval = this->mb->tag_get_handle("GLOBAL_ID", this->tags[global_id]);
+    rval = this->mb->tag_get_handle("PERMEABILITY", this->tags[permeability]);
+    rval = this->mb->tag_get_handle("CENTROID", this->tags[centroid]);
+    rval = this->mb->tag_get_handle("DIRICHLET", this->tags[dirichlet]);
+    rval = this->mb->tag_get_handle("NEUMANN", this->tags[neumann]);
+    rval = this->mb->tag_get_handle("SOURCE", this->tags[source]);
 }
