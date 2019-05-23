@@ -161,12 +161,28 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     neumann_faces = subtract(neumann_faces, dirichlet_faces);
     neumann_nodes = subtract(neumann_nodes, dirichlet_nodes);
 
+    // Get internal faces and nodes.
+    Range internal_faces, internal_nodes;
+    rval = this->get_entities_by_dimension(0, 2, internal_faces);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("Unable to get internal faces");
+    }
+    internal_faces = subtract(internal_faces, neumann_faces);
+    internal_faces = subtract(internal_faces, dirichlet_faces);
+    rval = this->get_entities_by_dimension(0, 0, internal_nodes);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("Unable to get internal nodes");
+    }
+    internal_nodes = subtract(internal_nodes, neumann_nodes);
+    internal_nodes = subtract(internal_nodes, dirichlet_nodes);
+
+    // Node interpolation here.
+
     // Check source terms and assign their values straight to the
     // right hand vector.
     Range source_volumes;
     double source_term = 0.0;
     int volume_id = -1;
-    std::vector<int> ;
     rval = this->mb->get_entities_by_type_and_tag(0, MBTET,
                     &this->tags[source], NULL, 1, source_volumes);
     if (rval != MB_SUCCESS) {
@@ -176,8 +192,41 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
         this->mb->tag_get_data(this->tags[source], &(*it), 1, &source_term);
         this->mb->tag_get_data(this->tags[global_id], &(*it), 1, &volume_id);
         b[volume_id] += source_term;
-        // Insert values into transmissibility matrix here...
+        A.InsertGlobalValues(volume_id, 1, &source_term, &volume_id);
     }
+
+    this->visit_neumann_faces(A, b, neumann_faces);
+    this->visit_dirichlet_faces();
+    this->visit_internal_faces();
+}
+
+void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range neumann_faces) {
+    ErrorCode rval;
+    Range vols_sharing_face, face_vertices;
+    int vol_id = -1;
+
+    double *vert_coords = (double*) calloc(9);
+    double *faces_flow = (double*) calloc(neumann_faces.size());
+    rval = this->mb->tag_get_data(this->tags[neumann], neumann_faces, faces_flow);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("Unable to get Neumann BC");
+    }
+
+    for (Range::iterator it = neumann_faces.begin(); it != neumann_faces.end(); ++it) {
+        // TODO: Add exception treatment.
+        rval = this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
+        rval = this->mb->tag_get_data(this->tags[global_id], &vols_sharing_face[0], 1, &vol_id);
+        rval = this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
+        rval = this->mb->get_coords(face_vertices, vert_coords);
+    }
+}
+
+void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range dirichlet_faces) {
+
+}
+
+void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range internal_faces) {
+
 }
 
 void MPFADSolver::set_pressure_tags (Epetra_Vector& X, Range& volumes) {

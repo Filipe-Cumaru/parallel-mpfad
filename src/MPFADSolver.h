@@ -43,6 +43,7 @@ using namespace moab;
 enum TagsID {global_id, permeability, centroid, dirichlet,
                 neumann, source, pressure};
 
+// TODO: Add new methods to class header.
 class MPFADSolver {
 private:
     Interface *mb;
