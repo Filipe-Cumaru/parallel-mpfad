@@ -148,12 +148,12 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     // Retrieving Neumann faces and nodes. Notice that faces/nodes
     // that are also Dirichlet faces/nodes are filtered.
     Range neumann_faces, neumann_nodes;
-    rval = this->mb->tag_get_entities_by_type_and_tag(0, MBTRI,
+    rval = this->mb->get_entities_by_type_and_tag(0, MBTRI,
                     &this->tags[neumann], NULL, 1, neumann_faces);
     if (rval != MB_SUCCESS) {
         throw runtime_error("Unable to get neumann entities");
     }
-    rval = this->mb->tag_get_entities_by_type_and_tag(0, MBVERTEX,
+    rval = this->mb->get_entities_by_type_and_tag(0, MBVERTEX,
                     &this->tags[neumann], NULL, 1, neumann_nodes);
     if (rval != MB_SUCCESS) {
         throw runtime_error("Unable to get neumann entities");
@@ -161,7 +161,10 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     neumann_faces = subtract(neumann_faces, dirichlet_faces);
     neumann_nodes = subtract(neumann_nodes, dirichlet_nodes);
 
-    
+    // Check source terms and assign their values straight to the
+    // right hand vector.
+    Range source_volumes;
+    rval = this->mb->tag_get
 }
 
 void MPFADSolver::set_pressure_tags (Epetra_Vector& X, Range& volumes) {
