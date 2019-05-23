@@ -164,7 +164,20 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     // Check source terms and assign their values straight to the
     // right hand vector.
     Range source_volumes;
-    rval = this->mb->tag_get
+    double source_term = 0.0;
+    int volume_id = -1;
+    std::vector<int> ;
+    rval = this->mb->get_entities_by_type_and_tag(0, MBTET,
+                    &this->tags[source], NULL, 1, source_volumes);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("Unable to get source terms");
+    }
+    for (Range::iterator it = source_volumes.begin(); it != source_volumes.end(); ++it) {
+        this->mb->tag_get_data(this->tags[source], &(*it), 1, &source_term);
+        this->mb->tag_get_data(this->tags[global_id], &(*it), 1, &volume_id);
+        b[volume_id] += source_term;
+        // Insert values into transmissibility matrix here...
+    }
 }
 
 void MPFADSolver::set_pressure_tags (Epetra_Vector& X, Range& volumes) {
