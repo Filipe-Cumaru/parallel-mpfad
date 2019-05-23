@@ -128,8 +128,40 @@ void MPFADSolver::write_file (string fname) {
     }
 }
 
-void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range volumes, Tag* tag_handles) {
+void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range volumes) {
+    ErrorCode rval;
+    int num_vols = volumes.size();
 
+    // Retrieving Dirichlet faces and nodes.
+    Range dirichlet_faces, dirichlet_nodes;
+    rval = this->mb->tag_get_entities_by_type_and_tag(0, MBTRI,
+                    &this->tags[dirichlet], NULL, 1, dirichlet_faces);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("Unable to get dirichlet entities");
+    }
+    rval = this->mb->tag_get_entities_by_type_and_tag(0, MBVERTEX,
+                    &this->tags[dirichlet], NULL, 1, dirichlet_nodes);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("Unable to get dirichlet entities");
+    }
+
+    // Retrieving Neumann faces and nodes. Notice that faces/nodes
+    // that are also Dirichlet faces/nodes are filtered.
+    Range neumann_faces, neumann_nodes;
+    rval = this->mb->tag_get_entities_by_type_and_tag(0, MBTRI,
+                    &this->tags[neumann], NULL, 1, neumann_faces);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("Unable to get neumann entities");
+    }
+    rval = this->mb->tag_get_entities_by_type_and_tag(0, MBVERTEX,
+                    &this->tags[neumann], NULL, 1, neumann_nodes);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("Unable to get neumann entities");
+    }
+    neumann_faces = subtract(neumann_faces, dirichlet_faces);
+    neumann_nodes = subtract(neumann_nodes, dirichlet_nodes);
+
+    
 }
 
 void MPFADSolver::set_pressure_tags (Epetra_Vector& X, Range& volumes) {
