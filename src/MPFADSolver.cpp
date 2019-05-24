@@ -32,8 +32,9 @@ void MPFADSolver::run () {
     if (rval != MB_SUCCESS) {
         throw runtime_error("Could not retrieve volumes from the mesh.\n");
     }
-    // NOTE: Check how many layers need to be exchanged in a MPFA-D scheme.
-    rval = this->pcomm->exchange_ghost_cells(GHOST_DIM, BRIDGE_DIM, 1, 0, true);
+
+    // Exchange volumes sharing any vertex in an interface.
+    rval = this->pcomm->exchange_ghost_cells(3, 0, 1, 0, true);
     if (rval != MB_SUCCESS) {
         throw runtime_error("exchange_ghost_cells failed\n");
     }
@@ -50,7 +51,7 @@ void MPFADSolver::run () {
         printf("<%d> Error: Null pointer\n", rank);
         exit(EXIT_FAILURE);
     }
-    rval = this->mb->tag_get_data(tag_handles[global_id], volumes, (void*) gids);
+    rval = this->mb->tag_get_data(this->tags[global_id], volumes, (void*) gids);
     if (rval != MB_SUCCESS) {
         throw runtime_error("tag_get_data for gids failed\n");
     }
@@ -64,7 +65,7 @@ void MPFADSolver::run () {
 
     printf("<%d> Matrix assembly...\n", rank);
     ts = clock();
-    this->assemble_matrix(A, b, volumes, tag_handles);
+    this->assemble_matrix(A, b, volumes);
     ts = clock() - ts;
     printf("<%d> Done. Time elapsed: %f\n", rank, ((double) ts)/CLOCKS_PER_SEC);
 
@@ -125,6 +126,24 @@ void MPFADSolver::write_file (string fname) {
     rval = solver->mb->write_file(fname.c_str(), 0, write_opts.c_str(), &volumes_meshset, 1);
     if (rval != MB_SUCCESS) {
         throw runtime_error("write_file failed\n");
+    }
+}
+
+void MPFADSolver::init_tags () {
+    ErrorCode rval;
+    Range empty_set;
+    std::vector<Tag> tag_vector (&this->tags[0], &this->tags[6]+1);
+
+    rval = this->mb->tag_get_handle("GLOBAL_ID", this->tags[global_id]);
+    rval = this->mb->tag_get_handle("PERMEABILITY", this->tags[permeability]);
+    rval = this->mb->tag_get_handle("CENTROID", this->tags[centroid]);
+    rval = this->mb->tag_get_handle("DIRICHLET", this->tags[dirichlet]);
+    rval = this->mb->tag_get_handle("NEUMANN", this->tags[neumann]);
+    rval = this->mb->tag_get_handle("SOURCE", this->tags[source]);
+
+    rval = this->pcomm->exchange_tags(tag_vector, tag_vector, empty_set);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("exchange_tags failed");
     }
 }
 
@@ -200,6 +219,10 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     this->visit_internal_faces();
 }
 
+void MPFADSolver::set_pressure_tags (Epetra_Vector& X, Range& volumes) {
+
+}
+
 void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range neumann_faces) {
     ErrorCode rval;
     Range vols_sharing_face, face_vertices;
@@ -222,26 +245,9 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
 }
 
 void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range dirichlet_faces) {
-
+    return;
 }
 
 void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range internal_faces) {
-
-}
-
-void MPFADSolver::set_pressure_tags (Epetra_Vector& X, Range& volumes) {
-
-}
-
-void MPFADSolver::init_tags () {
-    // TODO: Check how to exchange tags for nodes and faces. Review ghost cell
-    // exchange in run method.
-    ErrorCode rval;
-
-    rval = this->mb->tag_get_handle("GLOBAL_ID", this->tags[global_id]);
-    rval = this->mb->tag_get_handle("PERMEABILITY", this->tags[permeability]);
-    rval = this->mb->tag_get_handle("CENTROID", this->tags[centroid]);
-    rval = this->mb->tag_get_handle("DIRICHLET", this->tags[dirichlet]);
-    rval = this->mb->tag_get_handle("NEUMANN", this->tags[neumann]);
-    rval = this->mb->tag_get_handle("SOURCE", this->tags[source]);
+    return;
 }

@@ -31,11 +31,6 @@
 /* MPI header */
 #include <mpi.h>
 
-#define ALL_PROCS -1
-#define ALL_DIM -1
-#define GHOST_DIM 3
-#define BRIDGE_DIM 2
-
 using namespace std;
 using namespace moab;
 
@@ -61,6 +56,9 @@ private:
     void assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range volumes, Tag* tag_handles);
     void set_pressure_tags (Epetra_Vector& X, Range& volumes);
     void init_tags ();
+    void visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range neumann_faces);
+    void visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range dirichlet_faces);
+    void visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range internal_faces);
 };
 
 #endif
