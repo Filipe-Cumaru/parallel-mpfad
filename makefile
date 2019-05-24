@@ -11,7 +11,7 @@ all: $(ALLEXAMPLES)
 
 MPFADSolver: MPFADSolver.o
 	@echo "[CXXLD]  $@"
-	${VERBOSE}$(MOAB_CXX) -o $@ main.cpp $< $(MOAB_LIBS_LINK) -std=c++11 -I$PWD -I/usr/include -I/home/facsa/Trilinos-Serial/include $(TRILINOS_LIB_LINKS)
+	${VERBOSE}$(MOAB_CXX) -o $@ main.cpp $< $(MOAB_LIBS_LINK) -std=c++11 -I$PWD -I/usr/include -I/home/facsa/Trilinos/include $(TRILINOS_LIB_LINKS)
 
 run: all $(addprefix run-,$(ALLEXAMPLES))
 
