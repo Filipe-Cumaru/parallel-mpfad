@@ -4,11 +4,11 @@ using namespace std;
 using namespace moab;
 
 MPFADSolver::MPFADSolver () : mb(new Core()),
-                            pcomm(mb, MPI_COMM_WORLD),
+                            pcomm(new ParallelComm(mb, MPI_COMM_WORLD)),
                             topo_util(new MeshTopoUtil(mb)) {}
 
 MPFADSolver::MPFADSolver (Interface* moab_interface) : mb(moab_interface),
-                                                pcomm(mb, MPI_COMM_WORLD),
+                                                pcomm(new ParallelComm(mb, MPI_COMM_WORLD)),
                                                 topo_util(new MeshTopoUtil(mb)) {}
 
 void MPFADSolver::run () {
@@ -111,6 +111,7 @@ void MPFADSolver::write_file (string fname) {
     string write_opts = "PARALLEL=WRITE_PART";
     EntityHandle volumes_meshset;
     Range volumes;
+    ErrorCode rval;
     rval = this->mb->create_meshset(0, volumes_meshset);
     if (rval != MB_SUCCESS) {
         throw runtime_error("write_file failed while creating meshset\n");
@@ -123,7 +124,7 @@ void MPFADSolver::write_file (string fname) {
     if (rval != MB_SUCCESS) {
         throw runtime_error("write_file failed while adding volumes to meshset\n");
     }
-    rval = solver->mb->write_file(fname.c_str(), 0, write_opts.c_str(), &volumes_meshset, 1);
+    rval = this->mb->write_file(fname.c_str(), 0, write_opts.c_str(), &volumes_meshset, 1);
     if (rval != MB_SUCCESS) {
         throw runtime_error("write_file failed\n");
     }
@@ -149,16 +150,15 @@ void MPFADSolver::init_tags () {
 
 void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range volumes) {
     ErrorCode rval;
-    int num_vols = volumes.size();
 
     // Retrieving Dirichlet faces and nodes.
     Range dirichlet_faces, dirichlet_nodes;
-    rval = this->mb->tag_get_entities_by_type_and_tag(0, MBTRI,
+    rval = this->mb->get_entities_by_type_and_tag(0, MBTRI,
                     &this->tags[dirichlet], NULL, 1, dirichlet_faces);
     if (rval != MB_SUCCESS) {
         throw runtime_error("Unable to get dirichlet entities");
     }
-    rval = this->mb->tag_get_entities_by_type_and_tag(0, MBVERTEX,
+    rval = this->mb->get_entities_by_type_and_tag(0, MBVERTEX,
                     &this->tags[dirichlet], NULL, 1, dirichlet_nodes);
     if (rval != MB_SUCCESS) {
         throw runtime_error("Unable to get dirichlet entities");
@@ -182,13 +182,13 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
 
     // Get internal faces and nodes.
     Range internal_faces, internal_nodes;
-    rval = this->get_entities_by_dimension(0, 2, internal_faces);
+    rval = this->mb->get_entities_by_dimension(0, 2, internal_faces);
     if (rval != MB_SUCCESS) {
         throw runtime_error("Unable to get internal faces");
     }
     internal_faces = subtract(internal_faces, neumann_faces);
     internal_faces = subtract(internal_faces, dirichlet_faces);
-    rval = this->get_entities_by_dimension(0, 0, internal_nodes);
+    rval = this->mb->get_entities_by_dimension(0, 0, internal_nodes);
     if (rval != MB_SUCCESS) {
         throw runtime_error("Unable to get internal nodes");
     }
@@ -228,8 +228,8 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
     Range vols_sharing_face, face_vertices;
     int vol_id = -1;
 
-    double *vert_coords = (double*) calloc(9);
-    double *faces_flow = (double*) calloc(neumann_faces.size());
+    double *vert_coords = (double*) calloc(9, sizeof(double));
+    double *faces_flow = (double*) calloc(neumann_faces.size(), sizeof(double));
     rval = this->mb->tag_get_data(this->tags[neumann], neumann_faces, faces_flow);
     if (rval != MB_SUCCESS) {
         throw runtime_error("Unable to get Neumann BC");
@@ -238,7 +238,7 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
     for (Range::iterator it = neumann_faces.begin(); it != neumann_faces.end(); ++it) {
         // TODO: Add exception treatment.
         rval = this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
-        rval = this->mb->tag_get_data(this->tags[global_id], &vols_sharing_face[0], 1, &vol_id);
+        rval = this->mb->tag_get_data(this->tags[global_id], &(*vols_sharing_face.begin()), 1, &vol_id);
         rval = this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
         rval = this->mb->get_coords(face_vertices, vert_coords);
     }

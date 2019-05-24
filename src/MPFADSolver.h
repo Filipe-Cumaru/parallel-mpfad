@@ -53,7 +53,7 @@ public:
     void write_file (string fname);
 private:
     void setup_tags (Tag tag_handles[5]);
-    void assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range volumes, Tag* tag_handles);
+    void assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range volumes);
     void set_pressure_tags (Epetra_Vector& X, Range& volumes);
     void init_tags ();
     void visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range neumann_faces);
