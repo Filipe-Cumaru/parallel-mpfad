@@ -28,6 +28,9 @@
 #include "ml_include.h"
 #include "ml_epetra_preconditioner.h"
 
+/* BLAS header */
+#include "cblas.h"
+
 /* MPI header */
 #include <mpi.h>
 
@@ -38,7 +41,6 @@ using namespace moab;
 enum TagsID {global_id, permeability, centroid, dirichlet,
                 neumann, source, pressure};
 
-// TODO: Add new methods to class header.
 class MPFADSolver {
 private:
     Interface *mb;
@@ -56,6 +58,7 @@ private:
     void assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range volumes);
     void set_pressure_tags (Epetra_Vector& X, Range& volumes);
     void init_tags ();
+    double get_face_area (double vert_coords[9]);
     void visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range neumann_faces);
     void visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range dirichlet_faces);
     void visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range internal_faces);

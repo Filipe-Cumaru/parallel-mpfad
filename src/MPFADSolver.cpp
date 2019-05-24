@@ -220,13 +220,21 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
 }
 
 void MPFADSolver::set_pressure_tags (Epetra_Vector& X, Range& volumes) {
+    return;
+}
 
+double MPFADSolver::get_face_area (double vert_coords[9]) {
+    double ab[3] = { vert_coords[3] - vert_coords[0], vert_coords[4] - vert_coords[1], vert_coords[5] - vert_coords[2] };
+    double ac[3] = { vert_coords[6] - vert_coords[0], vert_coords[7] - vert_coords[1], vert_coords[8] - vert_coords[2] };
+    double area_vector[3] = { ab[1]*ac[2] - ab[2]*ac[1], ab[2]*ac[0] - ab[0]*ac[2], ab[0]*ac[1] - ab[1]*ac[0] };
+    return sqrt(cblas_ddot(3, &area_vector[0], sizeof(double), &area_vector[0], sizeof(double)));
 }
 
 void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range neumann_faces) {
     ErrorCode rval;
     Range vols_sharing_face, face_vertices;
-    int vol_id = -1;
+    int vol_id = -1, i = 0;
+    double face_area = 0.0;
 
     double *vert_coords = (double*) calloc(9, sizeof(double));
     double *faces_flow = (double*) calloc(neumann_faces.size(), sizeof(double));
@@ -235,12 +243,14 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
         throw runtime_error("Unable to get Neumann BC");
     }
 
-    for (Range::iterator it = neumann_faces.begin(); it != neumann_faces.end(); ++it) {
+    for (Range::iterator it = neumann_faces.begin(); it != neumann_faces.end(); ++it, ++i) {
         // TODO: Add exception treatment.
         rval = this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
         rval = this->mb->tag_get_data(this->tags[global_id], &(*vols_sharing_face.begin()), 1, &vol_id);
         rval = this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
         rval = this->mb->get_coords(face_vertices, vert_coords);
+        face_area = this->get_face_area(vert_coords);
+        b[vol_id] -= faces_flow[i]*face_area;
     }
 }
 
