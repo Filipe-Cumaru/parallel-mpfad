@@ -223,10 +223,27 @@ void MPFADSolver::set_pressure_tags (Epetra_Vector& X, Range& volumes) {
     return;
 }
 
+double* MPFADSolver::cross_product(double u[3], double v[3]) {
+    static double n[3] = { u[1]*v[2] - u[2]*v[1], a[2]*b[0] - a[0]*b[2],
+        a[0]*b[1] - a[1]*b[0]};
+    return n;
+}
+
+double* MPFADSolver::get_normal_vector (double vert_coords[9]) {
+    double ab[3] = { vert_coords[3] - vert_coords[0],
+        vert_coords[4] - vert_coords[1], vert_coords[5] - vert_coords[2] };
+    double ac[3] = { vert_coords[6] - vert_coords[0],
+        vert_coords[7] - vert_coords[1], vert_coords[8] - vert_coords[2] };
+    return this->cross_product(ab, ac);
+}
+
 double MPFADSolver::get_face_area (double vert_coords[9]) {
-    double ab[3] = { vert_coords[3] - vert_coords[0], vert_coords[4] - vert_coords[1], vert_coords[5] - vert_coords[2] };
-    double ac[3] = { vert_coords[6] - vert_coords[0], vert_coords[7] - vert_coords[1], vert_coords[8] - vert_coords[2] };
-    double area_vector[3] = { ab[1]*ac[2] - ab[2]*ac[1], ab[2]*ac[0] - ab[0]*ac[2], ab[0]*ac[1] - ab[1]*ac[0] };
+    double ab[3] = { vert_coords[3] - vert_coords[0],
+        vert_coords[4] - vert_coords[1], vert_coords[5] - vert_coords[2] };
+    double ac[3] = { vert_coords[6] - vert_coords[0],
+        vert_coords[7] - vert_coords[1], vert_coords[8] - vert_coords[2] };
+    double area_vector[3] = { ab[1]*ac[2] - ab[2]*ac[1],
+        ab[2]*ac[0] - ab[0]*ac[2], ab[0]*ac[1] - ab[1]*ac[0] };
     return sqrt(cblas_ddot(3, &area_vector[0], sizeof(double), &area_vector[0], sizeof(double)));
 }
 
@@ -255,7 +272,42 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
 }
 
 void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range dirichlet_faces) {
-    return;
+    ErrorCode rval;
+    Range face_vertices;
+    int vol_id = -1;
+    double face_area = 0.0, h_L;
+    double *normal_vector, i[3], j[3], k[3], l[3], n_IJK[3], tan_JI[3], tan_JK[3];
+
+    double *vert_coords = (double*) calloc(9, sizeof(double));
+    double *faces_pressure = (double*) calloc(dirichlet_faces.size(), sizeof(double));
+    rval = this->mb->tag_get_data(this->tags[dirichlet], dirichlet_faces, faces_pressure);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("Unable to get Dirichlet BC");
+    }
+
+    for (Range::iterator it = dirichlet_faces.begin(); it != dirichlet_faces.end(); ++it) {
+        rval = this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
+        rval = this->mb->get_coords(face_vertices, vert_coords);
+
+        // Dividing vertices coordinate array into three points.
+        i[0] = vert_coords[0]; i[1] = vert_coords[1]; i[2] = vert_coords[2];
+        j[0] = vert_coords[3]; j[1] = vert_coords[4]; j[2] = vert_coords[5];
+        k[0] = vert_coords[6]; k[1] = vert_coords[7]; k[2] = vert_coords[8];
+
+        // Calculating normal term.
+        n_IJK = this->get_normal_vector(vert_coords); n_IJK[0] *= 0.5; n_IJK[1] *= 0.5; n_IJK[2] *= 0.5;
+
+        // Calculating tangential terms.
+        cblas_dcopy(3, &i[0], sizeof(double), &tan_JI[0], sizeof(double));
+        cblas_daxpy(3, -1, &j[0], sizeof(double), &tan_JI[0], sizeof(double));
+        tan_JI = this->cross_product(n_IJK, tan_JI);
+        cblas_dcopy(3, &k[0], sizeof(double), &tan_JK[0], sizeof(double));
+        cblas_daxpy(3, -1, &j[0], sizeof(double), &tan_JK[0], sizeof(double));
+        tan_JK = this->cross_product(n_IJK, tan_JK);
+
+        face_area = this->get_face_area(vert_coords);
+        h_L =
+    }
 }
 
 void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range internal_faces) {
