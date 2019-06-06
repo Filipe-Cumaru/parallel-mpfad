@@ -273,10 +273,12 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
 
 void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range dirichlet_faces) {
     ErrorCode rval;
-    Range face_vertices;
+    Range face_vertices, vols_sharing_face;
     int vol_id = -1;
-    double face_area = 0.0, h_L;
-    double *normal_vector, i[3], j[3], k[3], l[3], n_IJK[3], tan_JI[3], tan_JK[3];
+    double face_area = 0.0, h_L = 0, k_n_L = 0, k_L_JI = 0, k_L_JK = 0;
+    double *normal_vector;
+    double i[3], j[3], k[3], l[3], lj[3], n_IJK[3], tan_JI[3], tan_JK[3];
+    double node_pressure[3], k_L[9], temp[3] = {0, 0, 0};
 
     double *vert_coords = (double*) calloc(9, sizeof(double));
     double *faces_pressure = (double*) calloc(dirichlet_faces.size(), sizeof(double));
@@ -288,25 +290,51 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
     for (Range::iterator it = dirichlet_faces.begin(); it != dirichlet_faces.end(); ++it) {
         rval = this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
         rval = this->mb->get_coords(face_vertices, vert_coords);
+        rval = this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
 
         // Dividing vertices coordinate array into three points.
         i[0] = vert_coords[0]; i[1] = vert_coords[1]; i[2] = vert_coords[2];
         j[0] = vert_coords[3]; j[1] = vert_coords[4]; j[2] = vert_coords[5];
         k[0] = vert_coords[6]; k[1] = vert_coords[7]; k[2] = vert_coords[8];
 
+        // Retrieving left volume centroid.
+        rval = this->mb->tag_get_data(this->tags[centroid], &vols_sharing_face[0], 1, &l);
+
         // Calculating normal term.
         n_IJK = this->get_normal_vector(vert_coords); n_IJK[0] *= 0.5; n_IJK[1] *= 0.5; n_IJK[2] *= 0.5;
 
         // Calculating tangential terms.
-        cblas_dcopy(3, &i[0], sizeof(double), &tan_JI[0], sizeof(double));
-        cblas_daxpy(3, -1, &j[0], sizeof(double), &tan_JI[0], sizeof(double));
-        tan_JI = this->cross_product(n_IJK, tan_JI);
+        cblas_dcopy(3, &i[0], sizeof(double), &tan_JI[0], sizeof(double));  // tan_JI = i
+        cblas_daxpy(3, -1, &j[0], sizeof(double), &tan_JI[0], sizeof(double));  // tan_JI = -j + tan_JI
+        tan_JI = this->cross_product(n_IJK, tan_JI);    // tan_JI = n_IJK x tan_JI
         cblas_dcopy(3, &k[0], sizeof(double), &tan_JK[0], sizeof(double));
         cblas_daxpy(3, -1, &j[0], sizeof(double), &tan_JK[0], sizeof(double));
         tan_JK = this->cross_product(n_IJK, tan_JK);
 
-        face_area = this->get_face_area(vert_coords);
-        h_L =
+        // Calculating the distance between the normal vector to the face
+        // and the vector from the face to the centroid.
+        face_area = this->get_face_area(vert_coords);   // REVIEW: Use BLAS routines to compute areas.
+        cblas_dcopy(3, &j[0], sizeof(double), &lj[0], sizeof(double));
+        cblas_daxpy(3, -1, &l[0], sizeof(double), &lj[0], sizeof(double));
+        h_L = cblas_ddot(3, &n_IJK[0], sizeof(double), &lj[0], sizeof(double)) / face_area;
+
+        rval = this->mb->tag_get_data(this->tags[dirichlet], face_vertices, &node_pressure);
+        rval = this->mb->tag_get_data(this->tags[permeability], &vols_sharing_face[0], 1, &k_L);
+
+        // Calculating <<N_IJK, K_L>, N_IJK> = trans(trans(N_IJK)*K_L)*N_IJK,
+        // i.e., TPFA term.
+        cblas_dgemm(101, 112, 111, 1, 3, 3, 1.0, &n_IJK[0], 3, &k_L[0], 3, 1.0, &temp[0], 3);
+        k_n_L = cblas_ddot(3, &temp[0], sizeof(double), &n_IJK[0], sizeof(double)) / pow(face_area, 2);
+        temp[0] = 0; temp[1] = 0; temp[2] = 0;
+
+        // Same as <<N_IJK, K_L>, tan_JI> = trans(trans(N_IJK)*K_L)*tan_JI
+        cblas_dgemm(101, 112, 111, 1, 3, 3, 1.0, &n_IJK[0], 3, &k_L[0], 3, 1.0, &temp[0], 3);
+        k_L_JI = cblas_ddot(3, &temp[0], sizeof(double), &tan_JI[0], sizeof(double)) / pow(face_area, 2);
+        temp[0] = 0; temp[1] = 0; temp[2] = 0;
+
+        // Same as <<N_IJK, K_L>, tan_JK> = trans(trans(N_IJK)*K_L)*tan_JK
+        cblas_dgemm(101, 112, 111, 1, 3, 3, 1.0, &n_IJK[0], 3, &k_L[0], 3, 1.0, &temp[0], 3);
+        k_L_JK = cblas_ddot(3, &temp[0], sizeof(double), &tan_JK[0], sizeof(double)) / pow(face_area, 2);
     }
 }
 
