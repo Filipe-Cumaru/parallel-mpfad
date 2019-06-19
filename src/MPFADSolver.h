@@ -59,6 +59,10 @@ private:
     void set_pressure_tags (Epetra_Vector& X, Range& volumes);
     void init_tags ();
     double get_face_area (double vert_coords[9]);
+    double get_cross_diffusion_term (double tan[3], double vec[3], double s,
+                                    double h1, double Kn1, double Kt1,
+                                    double h2, double Kn2, double Kt2,
+                                    bool boundary);
     void visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range neumann_faces);
     void visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range dirichlet_faces);
     void visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range internal_faces);

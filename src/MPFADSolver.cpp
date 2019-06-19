@@ -195,7 +195,7 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     internal_nodes = subtract(internal_nodes, neumann_nodes);
     internal_nodes = subtract(internal_nodes, dirichlet_nodes);
 
-    // Node interpolation here.
+    // TODO: Node interpolation here.
 
     // Check source terms and assign their values straight to the
     // right hand vector.
@@ -275,7 +275,8 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
     ErrorCode rval;
     Range face_vertices, vols_sharing_face;
     int vol_id = -1;
-    double face_area = 0.0, h_L = 0, k_n_L = 0, k_L_JI = 0, k_L_JK = 0;
+    double face_area = 0.0, h_L = 0, k_n_L = 0, k_L_JI = 0, k_L_JK = 0,
+            d_JK = 0, d_JI = 0, k_eq = 0, rhs = 0;
     double *normal_vector;
     double i[3], j[3], k[3], l[3], lj[3], n_IJK[3], tan_JI[3], tan_JK[3];
     double node_pressure[3], k_L[9], temp[3] = {0, 0, 0};
@@ -335,7 +336,37 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         // Same as <<N_IJK, K_L>, tan_JK> = trans(trans(N_IJK)*K_L)*tan_JK
         cblas_dgemm(101, 112, 111, 1, 3, 3, 1.0, &n_IJK[0], 3, &k_L[0], 3, 1.0, &temp[0], 3);
         k_L_JK = cblas_ddot(3, &temp[0], sizeof(double), &tan_JK[0], sizeof(double)) / pow(face_area, 2);
+
+        d_JK = this->get_cross_diffusion_term(tan_JK, lj, face_area, h_L, k_n_L, k_L_JK, 0, 0, 0, true);
+        d_JI = this->get_cross_diffusion_term(tan_JI, lj, face_area, h_L, k_n_L, k_L_JI, 0, 0, 0, true);
+
+        k_eq = (face_area*k_n_L) / h_L;
+        rhs = d_JK*(node_pressure[0] - node_pressure[1]) - k_eq*node_pressure[1] + d_JI*(node_pressure[1] - node_pressure[2]);
+
+        rval = this->mb->tag_get_data(this->tags[global_id], &vols_sharing_face[0], 1, &vol_id);
+        b[vol_id] -= rhs;
+        A.InsertGlobalValues(vol_id, 1, &k_eq, &vol_id);
     }
+}
+
+double MPFADSolver::get_cross_diffusion_term (double tan[3], double vec[3], double s,
+                                              double h1, double Kn1, double Kt1,
+                                              double h2, double Kn2, double Kt2,
+                                              bool boundary) {
+    double mesh_anisotropy_term, physical_anisotropy_term, cross_diffusion_term;
+    double dot_term, cdf_term;
+    if (!boundary) {
+        mesh_anisotropy_term = cblas_ddot(3, &tan[0], sizeof(double), &vec[0], sizeof(double)) / pow(s, 2);
+        physical_anisotropy_term = -(h1*(Kt1 / Kn1) + h2*(Kt2 / Kn2))/s;
+        cross_diffusion_term = mesh_anisotropy_term + physical_anisotropy_term;
+    }
+    else {
+        dot_term = -Kn1*cblas_ddot(3, &tan[0], sizeof(double), &vec[0], sizeof(double));
+        cdf_term = h1*s*Kt1;
+        cross_diffusion_term = (dot_term + cdf_term) / (2 * h1 * s);
+    }
+
+    return cross_diffusion_term;
 }
 
 void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range internal_faces) {
