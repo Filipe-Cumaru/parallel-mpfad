@@ -1,4 +1,5 @@
 # Compilation files
+MPFADSolver
 makefile*
 mesh_files
 *.o
