@@ -1,3 +1,4 @@
 # Compilation files
+makefile*
 mesh_files
 *.o
