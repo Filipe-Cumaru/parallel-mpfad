@@ -267,6 +267,11 @@ double MPFADSolver::get_cross_diffusion_term (double tan[3], double vec[3], doub
     return cross_diffusion_term;
 }
 
+void MPFADSolver::node_treatment (double node[3], int id_left, int id_right,
+                                    double k_eq, double d_JI, double d_JK) {
+    return;
+}
+
 void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range neumann_faces) {
     ErrorCode rval;
     Range vols_sharing_face, face_vertices;
@@ -478,6 +483,6 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         A.InsertGlobalValues(left_id, 1, &k_eq, &right_id); k_eq = -k_eq;
         A.InsertGlobalValues(left_id, 1, &k_eq, &left_id);
 
-        // node treatment here
+        // Node treatment goes here. It depends on the interpolation.
     }
 }
