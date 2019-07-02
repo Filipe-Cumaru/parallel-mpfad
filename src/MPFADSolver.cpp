@@ -220,7 +220,16 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
 }
 
 void MPFADSolver::set_pressure_tags (Epetra_Vector& X, Range& volumes) {
-    return;
+    Tag pressure_tag;
+    ErrorCode rval;
+    rval = this->mb->tag_get_handle("PRESSURE", 1, MB_TYPE_DOUBLE, pressure_tag, MB_TAG_DENSE | MB_TAG_CREAT);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("Unable to create pressure tag");
+    }
+    rval = this->mb->tag_set_data(pressure_tag, volumes, &X[0]);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("Unable to set pressure data");
+    }
 }
 
 double* MPFADSolver::cross_product(double u[3], double v[3]) {
