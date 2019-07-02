@@ -302,7 +302,7 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
     int vol_id = -1;
     double face_area = 0.0, h_L = 0, k_n_L = 0, k_L_JI = 0, k_L_JK = 0,
             d_JK = 0, d_JI = 0, k_eq = 0, rhs = 0;
-    double *n_IJK, *tan_JI, *tan_JK;
+    double *n_IJK = NULL, *tan_JI = NULL, *tan_JK = NULL;
     double i[3], j[3], k[3], l[3], lj[3];
     double node_pressure[3], k_L[9], temp[3] = {0, 0, 0};
 
@@ -382,9 +382,9 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
     double face_area = 0, d_JK = 0, d_JI = 0, k_eq = 0;
     double h_L = 0, k_n_L = 0, k_L_JI = 0, k_L_JK = 0;
     double h_R = 0, k_n_R = 0, k_R_JI = 0, k_R_JK = 0;
-    double *n_IJK, *tan_JI, *tan_JK;
+    double *n_IJK = NULL, *tan_JI = NULL, *tan_JK = NULL;
     double i[3], j[3], k[3], l[3], r[3], lj[3], rj[3], dist_LR[3];
-    double node_pressure[3], k_L[9], k_R[9], temp[3] = {0, 0, 0};
+    double k_L[9], k_R[9], temp[3] = {0, 0, 0};
 
     double *vert_coords = (double*) calloc(9, sizeof(double));
 
@@ -406,9 +406,6 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         n_IJK = this->get_normal_vector(vert_coords);
         n_IJK[0] *= 0.5; n_IJK[1] *= 0.5; n_IJK[2] *= 0.5;
 
-        // REVIEW: Fix tan_JK and tan_JI definitions here and in the
-        // dirichlet faces
-        
         // Calculating tangential terms.
         cblas_dcopy(3, &i[0], sizeof(double), &tan_JI[0], sizeof(double));  // tan_JI = i
         cblas_daxpy(3, -1, &j[0], sizeof(double), &tan_JI[0], sizeof(double));  // tan_JI = -j + tan_JI = -j + i
