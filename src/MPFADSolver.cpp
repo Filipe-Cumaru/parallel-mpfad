@@ -227,7 +227,6 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
 
     this->visit_neumann_faces(A, b, neumann_faces);
     this->visit_dirichlet_faces(A, b, dirichlet_faces);
-    printf("Done w/ dirchlet motherfucker\n");
     this->visit_internal_faces(A, b, internal_faces);
 }
 
