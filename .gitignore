@@ -3,3 +3,6 @@ MPFADSolver
 makefile*
 mesh_files
 *.o
+*.h5m
+main.cpp
+mesh_adaptor.py
