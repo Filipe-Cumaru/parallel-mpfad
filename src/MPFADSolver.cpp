@@ -337,6 +337,7 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
     }
 
     for (Range::iterator it = dirichlet_faces.begin(); it != dirichlet_faces.end(); ++it) {
+        // After the third iteration a segmentation fault occurs.
         rval = this->topo_util->get_bridge_adjacencies(*it, 2, 0, face_vertices);
         rval = this->mb->get_coords(face_vertices, vert_coords);
         rval = this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
@@ -345,16 +346,6 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         i[0] = vert_coords[0]; i[1] = vert_coords[1]; i[2] = vert_coords[2];
         j[0] = vert_coords[3]; j[1] = vert_coords[4]; j[2] = vert_coords[5];
         k[0] = vert_coords[6]; k[1] = vert_coords[7]; k[2] = vert_coords[8];
-
-        // printf("i = <%lf, %lf, %lf>\n", i[0], i[1], i[2]);
-        // printf("j = <%lf, %lf, %lf>\n", j[0], j[1], j[2]);
-        // printf("k = <%lf, %lf, %lf>\n\n", k[0], k[1], k[2]);
-
-        // if ((i[0] == j[0] && i[1] == j[1] && i[2] == j[2]) ||
-        //     (i[0] == k[0] && i[1] == k[1] && i[2] == k[2]) ||
-        //     (j[0] == k[0] && j[1] == k[1] && i[2] == k[2])) {
-        //         printf("Whoop dee doo\n");
-        //     }
 
         // Retrieving left volume centroid.
         EntityHandle left_volume = vols_sharing_face[0];
