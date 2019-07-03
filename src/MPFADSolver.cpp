@@ -38,6 +38,14 @@ void MPFADSolver::run () {
     if (rval != MB_SUCCESS) {
         throw runtime_error("exchange_ghost_cells failed\n");
     }
+    rval = this->pcomm->exchange_ghost_cells(2, 0, 1, 0, true);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("exchange_ghost_cells failed\n");
+    }
+    rval = this->pcomm->exchange_ghost_cells(0, 0, 1, 0, true);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("exchange_ghost_cells failed\n");
+    }
 
     // Calculate the total numbers of elements in the mesh.
     int num_local_elems = volumes.size(), num_global_elems = 0;
@@ -73,21 +81,21 @@ void MPFADSolver::run () {
     AztecOO solver (linear_problem);
 
     // Setting up solver preconditioning
-    Teuchos::ParameterList MLList;
-    ML_Epetra::MultiLevelPreconditioner * MLPrec = new ML_Epetra::MultiLevelPreconditioner(A, true);
-    MLList.set("max levels", 4);
-    MLList.set("repartition: enable", 1);
-    MLList.set("repartition: partitioner", "ParMetis");
-    MLList.set("coarse: type", "Chebyshev");
-    MLList.set("coarse: sweeps", 2);
-    MLList.set("smoother: type", "Chebyshev");
-    MLList.set("aggregation: type", "METIS");
-    ML_Epetra::SetDefaults("SA", MLList);
-    solver.SetPrecOperator(MLPrec);
+    // Teuchos::ParameterList MLList;
+    // ML_Epetra::MultiLevelPreconditioner * MLPrec = new ML_Epetra::MultiLevelPreconditioner(A, true);
+    // MLList.set("max levels", 4);
+    // MLList.set("repartition: enable", 1);
+    // MLList.set("repartition: partitioner", "ParMetis");
+    // MLList.set("coarse: type", "Chebyshev");
+    // MLList.set("coarse: sweeps", 2);
+    // MLList.set("smoother: type", "Chebyshev");
+    // MLList.set("aggregation: type", "METIS");
+    // ML_Epetra::SetDefaults("SA", MLList);
+    // solver.SetPrecOperator(MLPrec);
     solver.SetAztecOption(AZ_kspace, 250);
     solver.SetAztecOption(AZ_solver, AZ_gmres_condnum);
     solver.Iterate(1000, 1e-14);
-    delete MLPrec;
+    // delete MLPrec;
 
     printf("<%d> Setting pressure...\n", rank);
     ts = clock();
@@ -219,6 +227,7 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
 
     this->visit_neumann_faces(A, b, neumann_faces);
     this->visit_dirichlet_faces(A, b, dirichlet_faces);
+    printf("Done w/ dirchlet motherfucker\n");
     this->visit_internal_faces(A, b, internal_faces);
 }
 
@@ -256,7 +265,7 @@ double MPFADSolver::get_face_area (double vert_coords[9]) {
         vert_coords[7] - vert_coords[1], vert_coords[8] - vert_coords[2] };
     double area_vector[3] = { ab[1]*ac[2] - ab[2]*ac[1],
         ab[2]*ac[0] - ab[0]*ac[2], ab[0]*ac[1] - ab[1]*ac[0] };
-    return sqrt(cblas_ddot(3, &area_vector[0], 1, &area_vector[0], sizeof(double)));
+    return sqrt(cblas_ddot(3, &area_vector[0], 1, &area_vector[0], 1));
 }
 
 double MPFADSolver::get_cross_diffusion_term (double tan[3], double vec[3], double s,
@@ -266,7 +275,7 @@ double MPFADSolver::get_cross_diffusion_term (double tan[3], double vec[3], doub
     double mesh_anisotropy_term, physical_anisotropy_term, cross_diffusion_term;
     double dot_term, cdf_term;
     if (!boundary) {
-        mesh_anisotropy_term = cblas_ddot(3, &tan[0], 1, &vec[0], sizeof(double)) / pow(s, 2);
+        mesh_anisotropy_term = cblas_ddot(3, &tan[0], 1, &vec[0], 1) / pow(s, 2);
         physical_anisotropy_term = -(h1*(Kt1 / Kn1) + h2*(Kt2 / Kn2))/s;
         cross_diffusion_term = mesh_anisotropy_term + physical_anisotropy_term;
     }
@@ -329,7 +338,7 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
     }
 
     for (Range::iterator it = dirichlet_faces.begin(); it != dirichlet_faces.end(); ++it) {
-        rval = this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
+        rval = this->topo_util->get_bridge_adjacencies(*it, 2, 0, face_vertices);
         rval = this->mb->get_coords(face_vertices, vert_coords);
         rval = this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
 
@@ -337,6 +346,16 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         i[0] = vert_coords[0]; i[1] = vert_coords[1]; i[2] = vert_coords[2];
         j[0] = vert_coords[3]; j[1] = vert_coords[4]; j[2] = vert_coords[5];
         k[0] = vert_coords[6]; k[1] = vert_coords[7]; k[2] = vert_coords[8];
+
+        // printf("i = <%lf, %lf, %lf>\n", i[0], i[1], i[2]);
+        // printf("j = <%lf, %lf, %lf>\n", j[0], j[1], j[2]);
+        // printf("k = <%lf, %lf, %lf>\n\n", k[0], k[1], k[2]);
+
+        // if ((i[0] == j[0] && i[1] == j[1] && i[2] == j[2]) ||
+        //     (i[0] == k[0] && i[1] == k[1] && i[2] == k[2]) ||
+        //     (j[0] == k[0] && j[1] == k[1] && i[2] == k[2])) {
+        //         printf("Whoop dee doo\n");
+        //     }
 
         // Retrieving left volume centroid.
         EntityHandle left_volume = vols_sharing_face[0];
