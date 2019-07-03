@@ -133,7 +133,6 @@ void MPFADSolver::write_file (string fname) {
 void MPFADSolver::init_tags () {
     ErrorCode rval;
     Range empty_set;
-    std::vector<Tag> tag_vector (&this->tags[0], &this->tags[6]+1);
 
     rval = this->mb->tag_get_handle("GLOBAL_ID", this->tags[global_id]);
     rval = this->mb->tag_get_handle("PERMEABILITY", this->tags[permeability]);
@@ -142,6 +141,10 @@ void MPFADSolver::init_tags () {
     rval = this->mb->tag_get_handle("NEUMANN", this->tags[neumann]);
     rval = this->mb->tag_get_handle("SOURCE", this->tags[source]);
 
+    std::vector<Tag> tag_vector;
+    for (int i = 0; i < 6; ++i) {
+        tag_vector.push_back(this->tags[i]);
+    }
     rval = this->pcomm->exchange_tags(tag_vector, tag_vector, empty_set);
     if (rval != MB_SUCCESS) {
         throw runtime_error("exchange_tags failed");
@@ -253,7 +256,7 @@ double MPFADSolver::get_face_area (double vert_coords[9]) {
         vert_coords[7] - vert_coords[1], vert_coords[8] - vert_coords[2] };
     double area_vector[3] = { ab[1]*ac[2] - ab[2]*ac[1],
         ab[2]*ac[0] - ab[0]*ac[2], ab[0]*ac[1] - ab[1]*ac[0] };
-    return sqrt(cblas_ddot(3, &area_vector[0], sizeof(double), &area_vector[0], sizeof(double)));
+    return sqrt(cblas_ddot(3, &area_vector[0], 1, &area_vector[0], sizeof(double)));
 }
 
 double MPFADSolver::get_cross_diffusion_term (double tan[3], double vec[3], double s,
@@ -263,12 +266,12 @@ double MPFADSolver::get_cross_diffusion_term (double tan[3], double vec[3], doub
     double mesh_anisotropy_term, physical_anisotropy_term, cross_diffusion_term;
     double dot_term, cdf_term;
     if (!boundary) {
-        mesh_anisotropy_term = cblas_ddot(3, &tan[0], sizeof(double), &vec[0], sizeof(double)) / pow(s, 2);
+        mesh_anisotropy_term = cblas_ddot(3, &tan[0], 1, &vec[0], sizeof(double)) / pow(s, 2);
         physical_anisotropy_term = -(h1*(Kt1 / Kn1) + h2*(Kt2 / Kn2))/s;
         cross_diffusion_term = mesh_anisotropy_term + physical_anisotropy_term;
     }
     else {
-        dot_term = -Kn1*cblas_ddot(3, &tan[0], sizeof(double), &vec[0], sizeof(double));
+        dot_term = -Kn1*cblas_ddot(3, &tan[0], 1, &vec[0], 1);
         cdf_term = h1*s*Kt1;
         cross_diffusion_term = (dot_term + cdf_term) / (2 * h1 * s);
     }
@@ -315,6 +318,9 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
     double i[3], j[3], k[3], l[3], lj[3];
     double node_pressure[3], k_L[9], temp[3] = {0, 0, 0};
 
+    tan_JI = (double*) calloc(3, sizeof(double));
+    tan_JK = (double*) calloc(3, sizeof(double));
+
     double *vert_coords = (double*) calloc(9, sizeof(double));
     double *faces_pressure = (double*) calloc(dirichlet_faces.size(), sizeof(double));
     rval = this->mb->tag_get_data(this->tags[dirichlet], dirichlet_faces, faces_pressure);
@@ -340,19 +346,19 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         n_IJK = this->get_normal_vector(vert_coords); n_IJK[0] *= 0.5; n_IJK[1] *= 0.5; n_IJK[2] *= 0.5;
 
         // Calculating tangential terms.
-        cblas_dcopy(3, &i[0], sizeof(double), &tan_JI[0], sizeof(double));  // tan_JI = i
-        cblas_daxpy(3, -1, &j[0], sizeof(double), &tan_JI[0], sizeof(double));  // tan_JI = -j + tan_JI
+        cblas_dcopy(3, &i[0], 1, &tan_JI[0], 1);  // tan_JI = i
+        cblas_daxpy(3, -1, &j[0], 1, &tan_JI[0], 1);  // tan_JI = -j + tan_JI
         tan_JI = this->cross_product(n_IJK, tan_JI);    // tan_JI = n_IJK x tan_JI
-        cblas_dcopy(3, &k[0], sizeof(double), &tan_JK[0], sizeof(double));
-        cblas_daxpy(3, -1, &j[0], sizeof(double), &tan_JK[0], sizeof(double));
+        cblas_dcopy(3, &k[0], 1, &tan_JK[0], 1);
+        cblas_daxpy(3, -1, &j[0], 1, &tan_JK[0], 1);
         tan_JK = this->cross_product(n_IJK, tan_JK);
 
         // Calculating the distance between the normal vector to the face
         // and the vector from the face to the centroid.
         face_area = this->get_face_area(vert_coords);   // REVIEW: Use BLAS routines to compute areas.
-        cblas_dcopy(3, &j[0], sizeof(double), &lj[0], sizeof(double));
-        cblas_daxpy(3, -1, &l[0], sizeof(double), &lj[0], sizeof(double));
-        h_L = cblas_ddot(3, &n_IJK[0], sizeof(double), &lj[0], sizeof(double)) / face_area;
+        cblas_dcopy(3, &j[0], 1, &lj[0], 1);
+        cblas_daxpy(3, -1, &l[0], 1, &lj[0], 1);
+        h_L = cblas_ddot(3, &n_IJK[0], 1, &lj[0], 1) / face_area;
 
         rval = this->mb->tag_get_data(this->tags[dirichlet], face_vertices, &node_pressure);
         rval = this->mb->tag_get_data(this->tags[permeability], &left_volume, 1, &k_L);
@@ -360,17 +366,17 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         // Calculating <<N_IJK, K_L>, N_IJK> = trans(trans(N_IJK)*K_L)*N_IJK,
         // i.e., TPFA term.
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 3, &k_L[0], 3, 1.0, &temp[0], 3);
-        k_n_L = cblas_ddot(3, &temp[0], sizeof(double), &n_IJK[0], sizeof(double)) / pow(face_area, 2);
+        k_n_L = cblas_ddot(3, &temp[0], 1, &n_IJK[0], 1) / pow(face_area, 2);
         temp[0] = 0; temp[1] = 0; temp[2] = 0;
 
         // Same as <<N_IJK, K_L>, tan_JI> = trans(trans(N_IJK)*K_L)*tan_JI
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 3, &k_L[0], 3, 1.0, &temp[0], 3);
-        k_L_JI = cblas_ddot(3, &temp[0], sizeof(double), &tan_JI[0], sizeof(double)) / pow(face_area, 2);
+        k_L_JI = cblas_ddot(3, &temp[0], 1, &tan_JI[0], 1) / pow(face_area, 2);
         temp[0] = 0; temp[1] = 0; temp[2] = 0;
 
         // Same as <<N_IJK, K_L>, tan_JK> = trans(trans(N_IJK)*K_L)*tan_JK
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 3, &k_L[0], 3, 1.0, &temp[0], 3);
-        k_L_JK = cblas_ddot(3, &temp[0], sizeof(double), &tan_JK[0], sizeof(double)) / pow(face_area, 2);
+        k_L_JK = cblas_ddot(3, &temp[0], 1, &tan_JK[0], 1) / pow(face_area, 2);
         temp[0] = 0; temp[1] = 0; temp[2] = 0;
 
         d_JK = this->get_cross_diffusion_term(tan_JK, lj, face_area, h_L, k_n_L, k_L_JK, 0, 0, 0, true);
@@ -416,11 +422,11 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         n_IJK[0] *= 0.5; n_IJK[1] *= 0.5; n_IJK[2] *= 0.5;
 
         // Calculating tangential terms.
-        cblas_dcopy(3, &i[0], sizeof(double), &tan_JI[0], sizeof(double));  // tan_JI = i
-        cblas_daxpy(3, -1, &j[0], sizeof(double), &tan_JI[0], sizeof(double));  // tan_JI = -j + tan_JI = -j + i
+        cblas_dcopy(3, &i[0], 1, &tan_JI[0], 1);  // tan_JI = i
+        cblas_daxpy(3, -1, &j[0], 1, &tan_JI[0], 1);  // tan_JI = -j + tan_JI = -j + i
         tan_JI = this->cross_product(n_IJK, tan_JI);    // tan_JI = n_IJK x tan_JI = n_IJK x (-j + i)
-        cblas_dcopy(3, &k[0], sizeof(double), &tan_JK[0], sizeof(double));
-        cblas_daxpy(3, -1, &j[0], sizeof(double), &tan_JK[0], sizeof(double));
+        cblas_dcopy(3, &k[0], 1, &tan_JK[0], 1);
+        cblas_daxpy(3, -1, &j[0], 1, &tan_JK[0], 1);
         tan_JK = this->cross_product(n_IJK, tan_JK);
 
         // REVIEW: Use BLAS routines to compute areas.
@@ -429,24 +435,24 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         /* RIGHT VOLUME PERMEABILITY TERMS */
 
         rval = this->mb->tag_get_data(this->tags[permeability], &right_volume, 1, &k_R);
-        cblas_dcopy(3, &j[0], sizeof(double), &rj[0], sizeof(double));  // RJ = J
-        cblas_daxpy(3, -1, &r[0], sizeof(double), &rj[0], sizeof(double));  // RJ = J - R
-        h_R = cblas_ddot(3, &n_IJK[0], sizeof(double), &rj[0], sizeof(double)) / face_area; // h_R = <N_IJK, RJ> / |N_IJK|
+        cblas_dcopy(3, &j[0], 1, &rj[0], 1);  // RJ = J
+        cblas_daxpy(3, -1, &r[0], 1, &rj[0], 1);  // RJ = J - R
+        h_R = cblas_ddot(3, &n_IJK[0], 1, &rj[0], 1) / face_area; // h_R = <N_IJK, RJ> / |N_IJK|
 
         // Calculating <<N_IJK, K_R>, N_IJK> = trans(trans(N_IJK)*K_R)*N_IJK,
         // i.e., TPFA term of the right volume.
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 3, &k_R[0], 3, 1.0, &temp[0], 3);
-        k_n_R = cblas_ddot(3, &temp[0], sizeof(double), &n_IJK[0], sizeof(double)) / pow(face_area, 2);
+        k_n_R = cblas_ddot(3, &temp[0], 1, &n_IJK[0], 1) / pow(face_area, 2);
         temp[0] = 0; temp[1] = 0; temp[2] = 0;
 
         // Same as <<N_IJK, K_R>, tan_JI> = trans(trans(N_IJK)*K_R)*tan_JI
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 3, &k_R[0], 3, 1.0, &temp[0], 3);
-        k_R_JI = cblas_ddot(3, &temp[0], sizeof(double), &tan_JI[0], sizeof(double)) / pow(face_area, 2);
+        k_R_JI = cblas_ddot(3, &temp[0], 1, &tan_JI[0], 1) / pow(face_area, 2);
         temp[0] = 0; temp[1] = 0; temp[2] = 0;
 
         // Same as <<N_IJK, K_R>, tan_JK> = trans(trans(N_IJK)*K_R)*tan_JK
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 3, &k_R[0], 3, 1.0, &temp[0], 3);
-        k_R_JK = cblas_ddot(3, &temp[0], sizeof(double), &tan_JK[0], sizeof(double)) / pow(face_area, 2);
+        k_R_JK = cblas_ddot(3, &temp[0], 1, &tan_JK[0], 1) / pow(face_area, 2);
         temp[0] = 0; temp[1] = 0; temp[2] = 0;
 
         /* --------------- */
@@ -454,30 +460,30 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         /* LEFT VOLUME PERMEABILITY TERMS */
 
         rval = this->mb->tag_get_data(this->tags[permeability], &left_volume, 1, &k_L);
-        cblas_dcopy(3, &j[0], sizeof(double), &lj[0], sizeof(double));  // LJ = J
-        cblas_daxpy(3, -1, &l[0], sizeof(double), &lj[0], sizeof(double));  // LJ = J - L
-        h_L = cblas_ddot(3, &n_IJK[0], sizeof(double), &lj[0], sizeof(double)) / face_area; // h_L = <N_IJK, LJ> / |N_IJK|
+        cblas_dcopy(3, &j[0], 1, &lj[0], 1);  // LJ = J
+        cblas_daxpy(3, -1, &l[0], 1, &lj[0], 1);  // LJ = J - L
+        h_L = cblas_ddot(3, &n_IJK[0], 1, &lj[0], 1) / face_area; // h_L = <N_IJK, LJ> / |N_IJK|
 
         // Calculating <<N_IJK, K_L>, N_IJK> = trans(trans(N_IJK)*K_L)*N_IJK,
         // i.e., TPFA term of the left volume.
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 3, &k_L[0], 3, 1.0, &temp[0], 3);
-        k_n_L = cblas_ddot(3, &temp[0], sizeof(double), &n_IJK[0], sizeof(double)) / pow(face_area, 2);
+        k_n_L = cblas_ddot(3, &temp[0], 1, &n_IJK[0], 1) / pow(face_area, 2);
         temp[0] = 0; temp[1] = 0; temp[2] = 0;
 
         // Same as <<N_IJK, K_L>, tan_JI> = trans(trans(N_IJK)*K_L)*tan_JI
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 3, &k_L[0], 3, 1.0, &temp[0], 3);
-        k_L_JI = cblas_ddot(3, &temp[0], sizeof(double), &tan_JI[0], sizeof(double)) / pow(face_area, 2);
+        k_L_JI = cblas_ddot(3, &temp[0], 1, &tan_JI[0], 1) / pow(face_area, 2);
         temp[0] = 0; temp[1] = 0; temp[2] = 0;
 
         // Same as <<N_IJK, K_L>, tan_JK> = trans(trans(N_IJK)*K_L)*tan_JK
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 3, &k_L[0], 3, 1.0, &temp[0], 3);
-        k_L_JK = cblas_ddot(3, &temp[0], sizeof(double), &tan_JK[0], sizeof(double)) / pow(face_area, 2);
+        k_L_JK = cblas_ddot(3, &temp[0], 1, &tan_JK[0], 1) / pow(face_area, 2);
         temp[0] = 0; temp[1] = 0; temp[2] = 0;
 
         /* --------------- */
 
-        cblas_dcopy(3, &r[0], sizeof(double), &dist_LR[0], sizeof(double));  // dist_LR = R
-        cblas_daxpy(3, -1, &l[0], sizeof(double), &dist_LR[0], sizeof(double));  // dist_LR = R - L
+        cblas_dcopy(3, &r[0], 1, &dist_LR[0], 1);  // dist_LR = R
+        cblas_daxpy(3, -1, &l[0], 1, &dist_LR[0], 1);  // dist_LR = R - L
         d_JI = this->get_cross_diffusion_term(tan_JI, dist_LR, face_area, h_L, k_n_L, k_L_JI, h_R, k_n_R, k_R_JI, false);
         d_JK = this->get_cross_diffusion_term(tan_JK, dist_LR, face_area, h_L, k_n_L, k_L_JK, h_R, k_n_R, k_R_JK, false);
 
