@@ -38,6 +38,14 @@ void MPFADSolver::run () {
     if (rval != MB_SUCCESS) {
         throw runtime_error("exchange_ghost_cells failed\n");
     }
+    rval = this->pcomm->exchange_ghost_cells(2, 0, 2, 0, true);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("exchange_ghost_cells failed\n");
+    }
+    rval = this->pcomm->exchange_ghost_cells(0, 0, 2, 0, true);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("exchange_ghost_cells failed\n");
+    }
 
     // Calculate the total numbers of elements in the mesh.
     int num_local_elems = volumes.size(), num_global_elems = 0;
