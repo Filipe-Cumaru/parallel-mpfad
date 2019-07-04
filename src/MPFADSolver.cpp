@@ -77,6 +77,8 @@ void MPFADSolver::run () {
     ts = clock() - ts;
     printf("<%d> Done. Time elapsed: %f\n", rank, ((double) ts)/CLOCKS_PER_SEC);
 
+    A.Print(cout);
+
     Epetra_LinearProblem linear_problem (&A, &X, &b);
     AztecOO solver (linear_problem);
 
@@ -414,6 +416,9 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
 
     double *vert_coords = (double*) calloc(9, sizeof(double));
 
+    tan_JK = (double*) calloc(3, sizeof(double));
+    tan_JI = (double*) calloc(3, sizeof(double));
+
     for (Range::iterator it = internal_faces.begin(); it != internal_faces.end(); ++it) {
         rval = this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
         rval = this->mb->get_coords(face_vertices, vert_coords);
@@ -509,5 +514,8 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         A.InsertGlobalValues(left_id, 1, &k_eq, &left_id);
 
         // Node treatment goes here. It depends on the interpolation.
+
+        face_vertices.clear();
+        vols_sharing_face.clear();
     }
 }
