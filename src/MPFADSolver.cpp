@@ -68,8 +68,7 @@ void MPFADSolver::run () {
     this->assemble_matrix(A, b, volumes);
     ts = clock() - ts;
     printf("<%d> Done. Time elapsed: %f\n", rank, ((double) ts)/CLOCKS_PER_SEC);
-
-    A.Print(cout);
+    A.FillComplete();
 
     Epetra_LinearProblem linear_problem (&A, &X, &b);
     AztecOO solver (linear_problem);
