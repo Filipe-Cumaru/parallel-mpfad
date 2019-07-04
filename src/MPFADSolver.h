@@ -65,8 +65,8 @@ private:
                                     double h1, double Kn1, double Kt1,
                                     double h2, double Kn2, double Kt2,
                                     bool boundary);
-    void node_treatment (double node[3], int id_left, int id_right,
-                        double k_eq, double d_JI, double d_JK);
+    void node_treatment (EntityHandle node, int id_left, int id_right,
+                        double k_eq, double d_JI, double d_JK, Epetra_Vector& b);
     void visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range neumann_faces);
     void visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range dirichlet_faces);
     void visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range internal_faces);
