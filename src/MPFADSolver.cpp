@@ -38,14 +38,14 @@ void MPFADSolver::run () {
     if (rval != MB_SUCCESS) {
         throw runtime_error("exchange_ghost_cells failed\n");
     }
-    rval = this->pcomm->exchange_ghost_cells(2, 0, 1, 0, true);
-    if (rval != MB_SUCCESS) {
-        throw runtime_error("exchange_ghost_cells failed\n");
-    }
-    rval = this->pcomm->exchange_ghost_cells(0, 0, 1, 0, true);
-    if (rval != MB_SUCCESS) {
-        throw runtime_error("exchange_ghost_cells failed\n");
-    }
+    // rval = this->pcomm->exchange_ghost_cells(2, 0, 1, 0, true);
+    // if (rval != MB_SUCCESS) {
+    //     throw runtime_error("exchange_ghost_cells failed\n");
+    // }
+    // rval = this->pcomm->exchange_ghost_cells(0, 0, 1, 0, true);
+    // if (rval != MB_SUCCESS) {
+    //     throw runtime_error("exchange_ghost_cells failed\n");
+    // }
 
     // Calculate the total numbers of elements in the mesh.
     int num_local_elems = volumes.size(), num_global_elems = 0;
@@ -337,7 +337,6 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
     }
 
     for (Range::iterator it = dirichlet_faces.begin(); it != dirichlet_faces.end(); ++it) {
-        // After the third iteration a segmentation fault occurs.
         rval = this->topo_util->get_bridge_adjacencies(*it, 2, 0, face_vertices);
         rval = this->mb->get_coords(face_vertices, vert_coords);
         rval = this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
@@ -397,6 +396,9 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         rval = this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &vol_id);
         b[vol_id] -= rhs;
         A.InsertGlobalValues(vol_id, 1, &k_eq, &vol_id);
+
+        face_vertices.clear();
+        vols_sharing_face.clear();
     }
 }
 
