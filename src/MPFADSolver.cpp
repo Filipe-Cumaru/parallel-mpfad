@@ -416,7 +416,6 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 
         face_vertices.clear();
         vols_sharing_face.clear();
-        printf("\n");
     }
 }
 
@@ -529,10 +528,10 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         int left_id, right_id;
         rval = this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &left_id);
         rval = this->mb->tag_get_data(this->tags[global_id], &right_volume, 1, &right_id);
-        A.InsertGlobalValues(right_id, 1, &k_eq, &right_id); k_eq = -k_eq;
+        A.InsertGlobalValues(right_id, 1, &k_eq, &right_id);
+        A.InsertGlobalValues(left_id, 1, &k_eq, &left_id); k_eq = -k_eq;
         A.InsertGlobalValues(right_id, 1, &k_eq, &left_id);
-        A.InsertGlobalValues(left_id, 1, &k_eq, &right_id); k_eq = -k_eq;
-        A.InsertGlobalValues(left_id, 1, &k_eq, &left_id);
+        A.InsertGlobalValues(left_id, 1, &k_eq, &right_id);
 
         // Node treatment goes here. It depends on the interpolation.
         this->node_treatment(face_vertices[0], left_id, right_id, k_eq, 0.0, d_JK, b);
