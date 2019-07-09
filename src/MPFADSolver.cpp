@@ -354,21 +354,15 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 
         // Dividing vertices coordinate array into three points.
         i[0] = vert_coords[0]; i[1] = vert_coords[1]; i[2] = vert_coords[2];
-        printf("i = <%lf, %lf, %lf>\n", i[0], i[1], i[2]);
         j[0] = vert_coords[3]; j[1] = vert_coords[4]; j[2] = vert_coords[5];
-        printf("j = <%lf, %lf, %lf>\n", j[0], j[1], j[2]);
         k[0] = vert_coords[6]; k[1] = vert_coords[7]; k[2] = vert_coords[8];
-        printf("k = <%lf, %lf, %lf>\n", k[0], k[1], k[2]);
 
         // Retrieving left volume centroid.
-        printf("# of volumes sharing face: %d\n", vols_sharing_face.size());
         EntityHandle left_volume = vols_sharing_face[0];
         rval = this->mb->tag_get_data(this->tags[centroid], &left_volume, 1, &l);
-        printf("Dirichlet volume centroid: <%lf, %lf, %lf>\n", l[0], l[1], l[2]);
 
         // Calculating normal term.
         this->get_normal_vector(vert_coords, n_IJK);
-        printf("N_IJK = <%lf, %lf, %lf>\n", n_IJK[0], n_IJK[1], n_IJK[2]);
         n_IJK[0] *= 0.5; n_IJK[1] *= 0.5; n_IJK[2] *= 0.5;
 
         // Calculating tangential terms.
@@ -376,10 +370,12 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         cblas_daxpy(3, -1, &j[0], 1, &tan_JI[0], 1);  // tan_JI = -j + tan_JI = i - j
         this->cross_product(n_IJK, tan_JI, temp);    // tan_JI = n_IJK x tan_JI = n_IJK x (i - j)
         tan_JI[0] = temp[0]; tan_JI[1] = temp[1]; tan_JI[2] = temp[2];
+
         cblas_dcopy(3, &k[0], 1, &tan_JK[0], 1);
         cblas_daxpy(3, -1, &j[0], 1, &tan_JK[0], 1);
         this->cross_product(n_IJK, tan_JK, temp);
         tan_JK[0] = temp[0]; tan_JK[1] = temp[1]; tan_JK[2] = temp[2];
+
         temp[0] = 0; temp[1] = 0; temp[2] = 0;
 
         // Calculating the distance between the normal vector to the face
@@ -462,10 +458,13 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         cblas_daxpy(3, -1, &j[0], 1, &tan_JI[0], 1);  // tan_JI = -j + tan_JI = -j + i
         this->cross_product(n_IJK, tan_JI, temp);    // tan_JI = n_IJK x tan_JI = n_IJK x (-j + i)
         tan_JI[0] = temp[0]; tan_JI[1] = temp[1]; tan_JI[2] = temp[2];
+
         cblas_dcopy(3, &k[0], 1, &tan_JK[0], 1);
         cblas_daxpy(3, -1, &j[0], 1, &tan_JK[0], 1);
         this->cross_product(n_IJK, tan_JK, temp);
         tan_JK[0] = temp[0]; tan_JK[1] = temp[1]; tan_JK[2] = temp[2];
+
+        temp[0] = 0; temp[1] = 0; temp[2] = 0;
 
         // REVIEW: Use BLAS routines to compute areas.
         face_area = this->get_face_area(vert_coords);
