@@ -78,6 +78,9 @@ void MPFADSolver::run () {
     printf("<%d> Done. Time elapsed: %f\n", rank, ((double) ts)/CLOCKS_PER_SEC);
     A.FillComplete();
 
+    A.Print(cout);
+    cout << b << endl;
+
     Epetra_LinearProblem linear_problem (&A, &X, &b);
     AztecOO solver (linear_problem);
 
@@ -94,6 +97,7 @@ void MPFADSolver::run () {
     // ML_Epetra::SetDefaults("SA", MLList);
     // solver.SetPrecOperator(MLPrec);
     solver.SetAztecOption(AZ_kspace, 250);
+    solver.SetAztecOption(AZ_precond, AZ_none);
     solver.SetAztecOption(AZ_solver, AZ_gmres_condnum);
     solver.Iterate(1000, 1e-14);
     // delete MLPrec;
@@ -244,18 +248,18 @@ void MPFADSolver::set_pressure_tags (Epetra_Vector& X, Range& volumes) {
     }
 }
 
-double* MPFADSolver::cross_product(double u[3], double v[3]) {
-    static double n[3] = { u[1]*v[2] - u[2]*v[1], u[2]*v[0] - u[0]*v[2],
-        u[0]*v[1] - u[1]*v[0]};
-    return n;
+void MPFADSolver::cross_product(double u[3], double v[3], double n[3]) {
+    n[0] = u[1]*v[2] - u[2]*v[1];
+    n[1] = u[2]*v[0] - u[0]*v[2];
+    n[2] = u[0]*v[1] - u[1]*v[0];
 }
 
-double* MPFADSolver::get_normal_vector (double vert_coords[9]) {
+void MPFADSolver::get_normal_vector (double vert_coords[9], double n[3]) {
     double ab[3] = { vert_coords[3] - vert_coords[0],
         vert_coords[4] - vert_coords[1], vert_coords[5] - vert_coords[2] };
     double ac[3] = { vert_coords[6] - vert_coords[0],
         vert_coords[7] - vert_coords[1], vert_coords[8] - vert_coords[2] };
-    return this->cross_product(ab, ac);
+    this->cross_product(ab, ac, n);
 }
 
 double MPFADSolver::get_face_area (double vert_coords[9]) {
@@ -329,7 +333,7 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
     int vol_id = -1;
     double face_area = 0.0, h_L = 0, k_n_L = 0, k_L_JI = 0, k_L_JK = 0,
             d_JK = 0, d_JI = 0, k_eq = 0, rhs = 0;
-    double *n_IJK = NULL, *tan_JI = NULL, *tan_JK = NULL;
+    double n_IJK[3], *tan_JI = NULL, *tan_JK = NULL;
     double i[3], j[3], k[3], l[3], lj[3];
     double node_pressure[3], k_L[9], temp[3] = {0, 0, 0};
 
@@ -350,23 +354,33 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 
         // Dividing vertices coordinate array into three points.
         i[0] = vert_coords[0]; i[1] = vert_coords[1]; i[2] = vert_coords[2];
+        printf("i = <%lf, %lf, %lf>\n", i[0], i[1], i[2]);
         j[0] = vert_coords[3]; j[1] = vert_coords[4]; j[2] = vert_coords[5];
+        printf("j = <%lf, %lf, %lf>\n", j[0], j[1], j[2]);
         k[0] = vert_coords[6]; k[1] = vert_coords[7]; k[2] = vert_coords[8];
+        printf("k = <%lf, %lf, %lf>\n", k[0], k[1], k[2]);
 
         // Retrieving left volume centroid.
+        printf("# of volumes sharing face: %d\n", vols_sharing_face.size());
         EntityHandle left_volume = vols_sharing_face[0];
         rval = this->mb->tag_get_data(this->tags[centroid], &left_volume, 1, &l);
+        printf("Dirichlet volume centroid: <%lf, %lf, %lf>\n", l[0], l[1], l[2]);
 
         // Calculating normal term.
-        n_IJK = this->get_normal_vector(vert_coords); n_IJK[0] *= 0.5; n_IJK[1] *= 0.5; n_IJK[2] *= 0.5;
+        this->get_normal_vector(vert_coords, n_IJK);
+        printf("N_IJK = <%lf, %lf, %lf>\n", n_IJK[0], n_IJK[1], n_IJK[2]);
+        n_IJK[0] *= 0.5; n_IJK[1] *= 0.5; n_IJK[2] *= 0.5;
 
         // Calculating tangential terms.
         cblas_dcopy(3, &i[0], 1, &tan_JI[0], 1);  // tan_JI = i
-        cblas_daxpy(3, -1, &j[0], 1, &tan_JI[0], 1);  // tan_JI = -j + tan_JI
-        tan_JI = this->cross_product(n_IJK, tan_JI);    // tan_JI = n_IJK x tan_JI
+        cblas_daxpy(3, -1, &j[0], 1, &tan_JI[0], 1);  // tan_JI = -j + tan_JI = i - j
+        this->cross_product(n_IJK, tan_JI, temp);    // tan_JI = n_IJK x tan_JI = n_IJK x (i - j)
+        tan_JI[0] = temp[0]; tan_JI[1] = temp[1]; tan_JI[2] = temp[2];
         cblas_dcopy(3, &k[0], 1, &tan_JK[0], 1);
         cblas_daxpy(3, -1, &j[0], 1, &tan_JK[0], 1);
-        tan_JK = this->cross_product(n_IJK, tan_JK);
+        this->cross_product(n_IJK, tan_JK, temp);
+        tan_JK[0] = temp[0]; tan_JK[1] = temp[1]; tan_JK[2] = temp[2];
+        temp[0] = 0; temp[1] = 0; temp[2] = 0;
 
         // Calculating the distance between the normal vector to the face
         // and the vector from the face to the centroid.
@@ -406,6 +420,7 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 
         face_vertices.clear();
         vols_sharing_face.clear();
+        printf("\n");
     }
 }
 
@@ -415,7 +430,7 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
     double face_area = 0, d_JK = 0, d_JI = 0, k_eq = 0;
     double h_L = 0, k_n_L = 0, k_L_JI = 0, k_L_JK = 0;
     double h_R = 0, k_n_R = 0, k_R_JI = 0, k_R_JK = 0;
-    double *n_IJK = NULL, *tan_JI = NULL, *tan_JK = NULL;
+    double n_IJK[3], *tan_JI = NULL, *tan_JK = NULL;
     double i[3], j[3], k[3], l[3], r[3], lj[3], rj[3], dist_LR[3];
     double k_L[9], k_R[9], temp[3] = {0, 0, 0};
 
@@ -439,16 +454,18 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         rval = this->mb->tag_get_data(this->tags[centroid], &right_volume, 1, &r);
 
         // Calculating normal term.
-        n_IJK = this->get_normal_vector(vert_coords);
+        this->get_normal_vector(vert_coords, n_IJK);
         n_IJK[0] *= 0.5; n_IJK[1] *= 0.5; n_IJK[2] *= 0.5;
 
         // Calculating tangential terms.
         cblas_dcopy(3, &i[0], 1, &tan_JI[0], 1);  // tan_JI = i
         cblas_daxpy(3, -1, &j[0], 1, &tan_JI[0], 1);  // tan_JI = -j + tan_JI = -j + i
-        tan_JI = this->cross_product(n_IJK, tan_JI);    // tan_JI = n_IJK x tan_JI = n_IJK x (-j + i)
+        this->cross_product(n_IJK, tan_JI, temp);    // tan_JI = n_IJK x tan_JI = n_IJK x (-j + i)
+        tan_JI[0] = temp[0]; tan_JI[1] = temp[1]; tan_JI[2] = temp[2];
         cblas_dcopy(3, &k[0], 1, &tan_JK[0], 1);
         cblas_daxpy(3, -1, &j[0], 1, &tan_JK[0], 1);
-        tan_JK = this->cross_product(n_IJK, tan_JK);
+        this->cross_product(n_IJK, tan_JK, temp);
+        tan_JK[0] = temp[0]; tan_JK[1] = temp[1]; tan_JK[2] = temp[2];
 
         // REVIEW: Use BLAS routines to compute areas.
         face_area = this->get_face_area(vert_coords);

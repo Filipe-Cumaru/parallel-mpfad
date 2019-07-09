@@ -59,8 +59,8 @@ private:
     void set_pressure_tags (Epetra_Vector& X, Range& volumes);
     void init_tags ();
     double get_face_area (double vert_coords[9]);
-    double* get_normal_vector (double vert_coords[9]);
-    double* cross_product(double u[3], double v[3]);
+    void get_normal_vector (double vert_coords[9], double n[3]);
+    void cross_product(double u[3], double v[3], double n[3]);
     double get_cross_diffusion_term (double tan[3], double vec[3], double s,
                                     double h1, double Kn1, double Kt1,
                                     double h2, double Kn2, double Kt2,
