@@ -4,5 +4,6 @@ makefile*
 mesh_files
 *.o
 *.h5m
+*.png
 main.cpp
 mesh_adaptor.py
