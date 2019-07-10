@@ -347,7 +347,6 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         throw runtime_error("Unable to get Dirichlet BC");
     }
 
-    printf("VISITING DIRICHLET FACES\n");
     for (Range::iterator it = dirichlet_faces.begin(); it != dirichlet_faces.end(); ++it) {
         rval = this->topo_util->get_bridge_adjacencies(*it, 2, 0, face_vertices);
         rval = this->mb->get_coords(face_vertices, vert_coords);
@@ -418,9 +417,6 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 
         face_vertices.clear();
         vols_sharing_face.clear();
-
-        printf("vol_id = %d\n", vol_id);
-        printf("k_eq = %lf\n", k_eq);
     }
 }
 
@@ -439,7 +435,6 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
     tan_JK = (double*) calloc(3, sizeof(double));
     tan_JI = (double*) calloc(3, sizeof(double));
 
-    printf("VISITING INTERNAL FACES\n");
     for (Range::iterator it = internal_faces.begin(); it != internal_faces.end(); ++it) {
         rval = this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
         rval = this->mb->get_coords(face_vertices, vert_coords);
@@ -548,8 +543,5 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
 
         face_vertices.clear();
         vols_sharing_face.clear();
-
-        printf("left_id = %d\tright_id = %d\n", left_id, right_id);
-        printf("k_eq = %lf\n", k_eq);
     }
 }
