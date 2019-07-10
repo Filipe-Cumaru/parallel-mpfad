@@ -347,6 +347,7 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         throw runtime_error("Unable to get Dirichlet BC");
     }
 
+    printf("VISITING DIRICHLET FACES\n");
     for (Range::iterator it = dirichlet_faces.begin(); it != dirichlet_faces.end(); ++it) {
         rval = this->topo_util->get_bridge_adjacencies(*it, 2, 0, face_vertices);
         rval = this->mb->get_coords(face_vertices, vert_coords);
@@ -384,6 +385,7 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         cblas_dcopy(3, &j[0], 1, &lj[0], 1);
         cblas_daxpy(3, -1, &l[0], 1, &lj[0], 1);
         h_L = cblas_ddot(3, &n_IJK[0], 1, &lj[0], 1) / face_area;
+        if (h_L < 0.0) h_L = -h_L;
 
         rval = this->mb->tag_get_data(this->tags[dirichlet], face_vertices, &node_pressure);
         rval = this->mb->tag_get_data(this->tags[permeability], &left_volume, 1, &k_L);
@@ -416,6 +418,9 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 
         face_vertices.clear();
         vols_sharing_face.clear();
+
+        printf("vol_id = %d\n", vol_id);
+        printf("k_eq = %lf\n", k_eq);
     }
 }
 
@@ -434,6 +439,7 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
     tan_JK = (double*) calloc(3, sizeof(double));
     tan_JI = (double*) calloc(3, sizeof(double));
 
+    printf("VISITING INTERNAL FACES\n");
     for (Range::iterator it = internal_faces.begin(); it != internal_faces.end(); ++it) {
         rval = this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
         rval = this->mb->get_coords(face_vertices, vert_coords);
@@ -474,6 +480,7 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         cblas_dcopy(3, &j[0], 1, &rj[0], 1);  // RJ = J
         cblas_daxpy(3, -1, &r[0], 1, &rj[0], 1);  // RJ = J - R
         h_R = cblas_ddot(3, &n_IJK[0], 1, &rj[0], 1) / face_area; // h_R = <N_IJK, RJ> / |N_IJK|
+        if (h_R < 0.0) h_R = -h_R;
 
         // Calculating <<N_IJK, K_R>, N_IJK> = trans(trans(N_IJK)*K_R)*N_IJK,
         // i.e., TPFA term of the right volume.
@@ -499,6 +506,7 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         cblas_dcopy(3, &j[0], 1, &lj[0], 1);  // LJ = J
         cblas_daxpy(3, -1, &l[0], 1, &lj[0], 1);  // LJ = J - L
         h_L = cblas_ddot(3, &n_IJK[0], 1, &lj[0], 1) / face_area; // h_L = <N_IJK, LJ> / |N_IJK|
+        if (h_L < 0.0) h_L = -h_L;
 
         // Calculating <<N_IJK, K_L>, N_IJK> = trans(trans(N_IJK)*K_L)*N_IJK,
         // i.e., TPFA term of the left volume.
@@ -540,5 +548,8 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
 
         face_vertices.clear();
         vols_sharing_face.clear();
+
+        printf("left_id = %d\tright_id = %d\n", left_id, right_id);
+        printf("k_eq = %lf\n", k_eq);
     }
 }
