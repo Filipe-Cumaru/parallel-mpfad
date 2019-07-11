@@ -378,8 +378,7 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         face_area = this->get_face_area(vert_coords);   // REVIEW: Use BLAS routines to compute areas.
         cblas_dcopy(3, &j[0], 1, &lj[0], 1);
         cblas_daxpy(3, -1, &l[0], 1, &lj[0], 1);
-        h_L = cblas_ddot(3, &n_IJK[0], 1, &lj[0], 1) / face_area;
-        if (h_L < 0.0) h_L = -h_L;
+        h_L = fabs(cblas_ddot(3, &n_IJK[0], 1, &lj[0], 1)) / face_area;
 
         rval = this->mb->tag_get_data(this->tags[dirichlet], face_vertices, &node_pressure);
         rval = this->mb->tag_get_data(this->tags[permeability], &left_volume, 1, &k_L);
@@ -469,8 +468,7 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         rval = this->mb->tag_get_data(this->tags[permeability], &right_volume, 1, &k_R);
         cblas_dcopy(3, &j[0], 1, &rj[0], 1);  // RJ = J
         cblas_daxpy(3, -1, &r[0], 1, &rj[0], 1);  // RJ = J - R
-        h_R = cblas_ddot(3, &n_IJK[0], 1, &rj[0], 1) / face_area; // h_R = <N_IJK, RJ> / |N_IJK|
-        if (h_R < 0.0) h_R = -h_R;
+        h_R = fabs(cblas_ddot(3, &n_IJK[0], 1, &rj[0], 1)) / face_area; // h_R = <N_IJK, RJ> / |N_IJK|
 
         // Calculating <<N_IJK, K_R>, N_IJK> = trans(trans(N_IJK)*K_R)*N_IJK,
         // i.e., TPFA term of the right volume.
@@ -495,8 +493,7 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         rval = this->mb->tag_get_data(this->tags[permeability], &left_volume, 1, &k_L);
         cblas_dcopy(3, &j[0], 1, &lj[0], 1);  // LJ = J
         cblas_daxpy(3, -1, &l[0], 1, &lj[0], 1);  // LJ = J - L
-        h_L = cblas_ddot(3, &n_IJK[0], 1, &lj[0], 1) / face_area; // h_L = <N_IJK, LJ> / |N_IJK|
-        if (h_L < 0.0) h_L = -h_L;
+        h_L = fabs(cblas_ddot(3, &n_IJK[0], 1, &lj[0], 1)) / face_area; // h_L = <N_IJK, LJ> / |N_IJK|
 
         // Calculating <<N_IJK, K_L>, N_IJK> = trans(trans(N_IJK)*K_L)*N_IJK,
         // i.e., TPFA term of the left volume.
