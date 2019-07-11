@@ -341,11 +341,6 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
     tan_JK = (double*) calloc(3, sizeof(double));
 
     double *vert_coords = (double*) calloc(9, sizeof(double));
-    double *faces_pressure = (double*) calloc(dirichlet_faces.size(), sizeof(double));
-    rval = this->mb->tag_get_data(this->tags[dirichlet], dirichlet_faces, faces_pressure);
-    if (rval != MB_SUCCESS) {
-        throw runtime_error("Unable to get Dirichlet BC");
-    }
 
     for (Range::iterator it = dirichlet_faces.begin(); it != dirichlet_faces.end(); ++it) {
         rval = this->topo_util->get_bridge_adjacencies(*it, 2, 0, face_vertices);
