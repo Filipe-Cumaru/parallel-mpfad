@@ -58,7 +58,7 @@ private:
     void assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range volumes);
     void set_pressure_tags (Epetra_Vector& X, Range& volumes);
     void init_tags ();
-    double get_face_area (double vert_coords[9]);
+    double get_face_area (double n[3]);
     void get_normal_vector (double vert_coords[9], double n[3]);
     void cross_product(double u[3], double v[3], double n[3]);
     double get_cross_diffusion_term (double tan[3], double vec[3], double s,

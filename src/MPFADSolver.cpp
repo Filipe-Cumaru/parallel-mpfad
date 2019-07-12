@@ -262,14 +262,8 @@ void MPFADSolver::get_normal_vector (double vert_coords[9], double n[3]) {
     this->cross_product(ab, ac, n);
 }
 
-double MPFADSolver::get_face_area (double vert_coords[9]) {
-    double ab[3] = { vert_coords[3] - vert_coords[0],
-        vert_coords[4] - vert_coords[1], vert_coords[5] - vert_coords[2] };
-    double ac[3] = { vert_coords[6] - vert_coords[0],
-        vert_coords[7] - vert_coords[1], vert_coords[8] - vert_coords[2] };
-    double area_vector[3] = { ab[1]*ac[2] - ab[2]*ac[1],
-        ab[2]*ac[0] - ab[0]*ac[2], ab[0]*ac[1] - ab[1]*ac[0] };
-    return sqrt(cblas_ddot(3, &area_vector[0], 1, &area_vector[0], 1));
+double MPFADSolver::get_face_area (double n[3]) {
+    return sqrt(cblas_ddot(3, &n[0], 1, &n[0], 1));
 }
 
 double MPFADSolver::get_cross_diffusion_term (double tan[3], double vec[3], double s,
@@ -299,6 +293,7 @@ void MPFADSolver::node_treatment (EntityHandle node, int id_left, int id_right,
     double rhs = 0.5 * k_eq * (d_JK + d_JI);
     double pressure = 0.0;
     this->mb->tag_get_data(this->tags[dirichlet], &node, 1, &pressure);
+    printf("Adding %lf to %d and subtracting from %d\n", rhs*pressure, id_left, id_right);
     b[id_left] += rhs*pressure;
     b[id_right] -= rhs*pressure;
 }
@@ -307,7 +302,7 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
     ErrorCode rval;
     Range vols_sharing_face, face_vertices;
     int vol_id = -1, i = 0;
-    double face_area = 0.0;
+    double face_area = 0.0, n_IJK[3];
 
     double *vert_coords = (double*) calloc(9, sizeof(double));
     double *faces_flow = (double*) calloc(neumann_faces.size(), sizeof(double));
@@ -322,7 +317,9 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
         rval = this->mb->tag_get_data(this->tags[global_id], &(*vols_sharing_face.begin()), 1, &vol_id);
         rval = this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
         rval = this->mb->get_coords(face_vertices, vert_coords);
-        face_area = this->get_face_area(vert_coords);
+        this->get_normal_vector(vert_coords, n_IJK);
+        cblas_dscal(3, 0.5, &n_IJK[0], 1);
+        face_area = this->get_face_area(n_IJK);
         b[vol_id] -= faces_flow[i]*face_area;
     }
 }
@@ -358,7 +355,8 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 
         // Calculating normal term.
         this->get_normal_vector(vert_coords, n_IJK);
-        n_IJK[0] *= 0.5; n_IJK[1] *= 0.5; n_IJK[2] *= 0.5;
+        cblas_dscal(3, 0.5, &n_IJK[0], 1);
+        face_area = this->get_face_area(n_IJK);
 
         // Calculating tangential terms.
         cblas_dcopy(3, &i[0], 1, &tan_JI[0], 1);  // tan_JI = i
@@ -375,7 +373,6 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 
         // Calculating the distance between the normal vector to the face
         // and the vector from the face to the centroid.
-        face_area = this->get_face_area(vert_coords);   // REVIEW: Use BLAS routines to compute areas.
         cblas_dcopy(3, &j[0], 1, &lj[0], 1);
         cblas_daxpy(3, -1, &l[0], 1, &lj[0], 1);
         h_L = fabs(cblas_ddot(3, &n_IJK[0], 1, &lj[0], 1)) / face_area;
@@ -407,6 +404,7 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 
         rval = this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &vol_id);
         b[vol_id] -= rhs;
+        printf("Subtracting %lf from %d\n", rhs);
         A.InsertGlobalValues(vol_id, 1, &k_eq, &vol_id);
 
         face_vertices.clear();
@@ -445,7 +443,8 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
 
         // Calculating normal term.
         this->get_normal_vector(vert_coords, n_IJK);
-        n_IJK[0] *= 0.5; n_IJK[1] *= 0.5; n_IJK[2] *= 0.5;
+        cblas_dscal(3, 0.5, &n_IJK[0], 1);
+        face_area = this->get_face_area(n_IJK);
 
         // Calculating tangential terms.
         cblas_dcopy(3, &i[0], 1, &tan_JI[0], 1);  // tan_JI = i
@@ -459,9 +458,6 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         tan_JK[0] = temp[0]; tan_JK[1] = temp[1]; tan_JK[2] = temp[2];
 
         temp[0] = 0; temp[1] = 0; temp[2] = 0;
-
-        // REVIEW: Use BLAS routines to compute areas.
-        face_area = this->get_face_area(vert_coords);
 
         /* RIGHT VOLUME PERMEABILITY TERMS */
 
