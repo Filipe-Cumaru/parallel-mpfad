@@ -78,9 +78,6 @@ void MPFADSolver::run () {
     printf("<%d> Done. Time elapsed: %f\n", rank, ((double) ts)/CLOCKS_PER_SEC);
     A.FillComplete();
 
-    A.Print(cout);
-    cout << b << endl;
-
     Epetra_LinearProblem linear_problem (&A, &X, &b);
     AztecOO solver (linear_problem);
 
@@ -107,6 +104,10 @@ void MPFADSolver::run () {
     this->set_pressure_tags(X, volumes);
     ts = clock() - ts;
     printf("<%d> Done. Time elapsed: %f\n", rank, ((double) ts)/CLOCKS_PER_SEC);
+
+    A.Print(cout);
+    cout << b << endl;
+    cout << X << endl;
 
     free(gids);
 }
@@ -293,7 +294,6 @@ void MPFADSolver::node_treatment (EntityHandle node, int id_left, int id_right,
     double rhs = 0.5 * k_eq * (d_JK + d_JI);
     double pressure = 0.0;
     this->mb->tag_get_data(this->tags[dirichlet], &node, 1, &pressure);
-    printf("Adding %lf to %d and subtracting from %d\n", rhs*pressure, id_left, id_right);
     b[id_left] += rhs*pressure;
     b[id_right] -= rhs*pressure;
 }
@@ -404,7 +404,6 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 
         rval = this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &vol_id);
         b[vol_id] -= rhs;
-        printf("Subtracting %lf from %d\n", rhs);
         A.InsertGlobalValues(vol_id, 1, &k_eq, &vol_id);
 
         face_vertices.clear();
@@ -519,15 +518,16 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         int left_id, right_id;
         rval = this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &left_id);
         rval = this->mb->tag_get_data(this->tags[global_id], &right_volume, 1, &right_id);
-        A.InsertGlobalValues(right_id, 1, &k_eq, &right_id);
-        A.InsertGlobalValues(left_id, 1, &k_eq, &left_id); k_eq = -k_eq;
-        A.InsertGlobalValues(right_id, 1, &k_eq, &left_id);
-        A.InsertGlobalValues(left_id, 1, &k_eq, &right_id);
 
         // Node treatment goes here. It depends on the interpolation.
         this->node_treatment(face_vertices[0], left_id, right_id, k_eq, 0.0, d_JK, b);
         this->node_treatment(face_vertices[1], left_id, right_id, k_eq, d_JI, -d_JK, b);
         this->node_treatment(face_vertices[2], left_id, right_id, k_eq, -d_JI, 0.0, b);
+
+        A.InsertGlobalValues(right_id, 1, &k_eq, &right_id);
+        A.InsertGlobalValues(left_id, 1, &k_eq, &left_id); k_eq = -k_eq;
+        A.InsertGlobalValues(right_id, 1, &k_eq, &left_id);
+        A.InsertGlobalValues(left_id, 1, &k_eq, &right_id);
 
         face_vertices.clear();
         vols_sharing_face.clear();
