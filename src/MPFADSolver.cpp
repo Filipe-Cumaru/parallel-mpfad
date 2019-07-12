@@ -515,19 +515,19 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
 
         k_eq = (k_n_R * k_n_L / ((k_n_R * h_R) + (k_n_L * h_L))) * face_area;
 
-        int left_id, right_id;
-        rval = this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &left_id);
-        rval = this->mb->tag_get_data(this->tags[global_id], &right_volume, 1, &right_id);
+        int id_left, id_right;
+        rval = this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &id_left);
+        rval = this->mb->tag_get_data(this->tags[global_id], &right_volume, 1, &id_right);
 
         // Node treatment goes here. It depends on the interpolation.
-        this->node_treatment(face_vertices[0], left_id, right_id, k_eq, 0.0, d_JK, b);
-        this->node_treatment(face_vertices[1], left_id, right_id, k_eq, d_JI, -d_JK, b);
-        this->node_treatment(face_vertices[2], left_id, right_id, k_eq, -d_JI, 0.0, b);
+        this->node_treatment(face_vertices[0], id_left, id_right, k_eq, 0.0, d_JK, b);
+        this->node_treatment(face_vertices[1], id_left, id_right, k_eq, d_JI, -d_JK, b);
+        this->node_treatment(face_vertices[2], id_left, id_right, k_eq, -d_JI, 0.0, b);
 
-        A.InsertGlobalValues(right_id, 1, &k_eq, &right_id);
-        A.InsertGlobalValues(left_id, 1, &k_eq, &left_id); k_eq = -k_eq;
-        A.InsertGlobalValues(right_id, 1, &k_eq, &left_id);
-        A.InsertGlobalValues(left_id, 1, &k_eq, &right_id);
+        A.InsertGlobalValues(id_right, 1, &k_eq, &id_right);
+        A.InsertGlobalValues(id_left, 1, &k_eq, &id_left); k_eq = -k_eq;
+        A.InsertGlobalValues(id_right, 1, &k_eq, &id_left);
+        A.InsertGlobalValues(id_left, 1, &k_eq, &id_right);
 
         face_vertices.clear();
         vols_sharing_face.clear();
