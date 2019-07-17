@@ -348,6 +348,7 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         rval = this->topo_util->get_bridge_adjacencies(*it, 2, 0, face_vertices);
         rval = this->mb->get_coords(face_vertices, vert_coords);
         rval = this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
+        rval = this->mb->tag_get_data(this->tags[dirichlet], face_vertices, &node_pressure);
 
         // Dividing vertices coordinate array into three points.
         i[0] = vert_coords[0]; i[1] = vert_coords[1]; i[2] = vert_coords[2];
@@ -366,20 +367,26 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         cblas_dcopy(3, &j[0], 1, &lj[0], 1);
         cblas_daxpy(3, -1, &l[0], 1, &lj[0], 1);
 
+        // Checking if the normal vector is oriented outward.
         double _test = cblas_ddot(3, &lj[0], 1, &n_IJK[0], 1);
         if (_test < 0.0) {
             k[0] = vert_coords[0]; k[1] = vert_coords[1]; k[2] = vert_coords[2];
             i[0] = vert_coords[6]; i[1] = vert_coords[7]; i[2] = vert_coords[8];
             cblas_dscal(3, -1.0, &n_IJK[0], 1);
         }
+        else {  // Why does get_bridge_adjacencies swap reverses its order in C++?
+            std::swap(node_pressure[0], node_pressure[2]);
+        }
 
         // Calculating tangential terms.
-        cblas_dcopy(3, &i[0], 1, &tan_JI[0], 1);  // tan_JI = i
+        // REVIEW: Investigate why those terms are swapped if it is implemented
+        // as the original code sugests.
+        cblas_dcopy(3, &k[0], 1, &tan_JI[0], 1);  // tan_JI = i
         cblas_daxpy(3, -1, &j[0], 1, &tan_JI[0], 1);  // tan_JI = -j + tan_JI = i - j
         this->cross_product(n_IJK, tan_JI, temp);    // tan_JI = n_IJK x tan_JI = n_IJK x (i - j)
         tan_JI[0] = temp[0]; tan_JI[1] = temp[1]; tan_JI[2] = temp[2];
 
-        cblas_dcopy(3, &k[0], 1, &tan_JK[0], 1);
+        cblas_dcopy(3, &i[0], 1, &tan_JK[0], 1);
         cblas_daxpy(3, -1, &j[0], 1, &tan_JK[0], 1);
         this->cross_product(n_IJK, tan_JK, temp);
         tan_JK[0] = temp[0]; tan_JK[1] = temp[1]; tan_JK[2] = temp[2];
@@ -390,7 +397,6 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         // and the vector from the face to the centroid.
         h_L = fabs(cblas_ddot(3, &n_IJK[0], 1, &lj[0], 1)) / face_area;
 
-        rval = this->mb->tag_get_data(this->tags[dirichlet], face_vertices, &node_pressure);
         rval = this->mb->tag_get_data(this->tags[permeability], &left_volume, 1, &k_L);
 
         // Calculating <<N_IJK, K_L>, N_IJK> = trans(trans(N_IJK)*K_L)*N_IJK,

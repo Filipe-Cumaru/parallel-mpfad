@@ -10,6 +10,7 @@
 #include <ctime>
 #include <string>
 #include <stdexcept>
+#include <utility> /* std::swap */
 
 /* MOAB includes */
 #include "moab/Core.hpp"
