@@ -375,14 +375,14 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         cblas_dcopy(3, &k[0], 1, &tan_JI[0], 1);  // tan_JI = i
         cblas_daxpy(3, -1, &j[0], 1, &tan_JI[0], 1);  // tan_JI = -j + tan_JI = i - j
         this->cross_product(n_IJK, tan_JI, temp);    // tan_JI = n_IJK x tan_JI = n_IJK x (i - j)
-        tan_JI[0] = temp[0]; tan_JI[1] = temp[1]; tan_JI[2] = temp[2];
+        cblas_dcopy(3, &temp[0], 1, &tan_JI[0], 1);
 
         cblas_dcopy(3, &i[0], 1, &tan_JK[0], 1);
         cblas_daxpy(3, -1, &j[0], 1, &tan_JK[0], 1);
         this->cross_product(n_IJK, tan_JK, temp);
-        tan_JK[0] = temp[0]; tan_JK[1] = temp[1]; tan_JK[2] = temp[2];
+        cblas_dcopy(3, &temp[0], 1, &tan_JK[0], 1);
 
-        temp[0] = 0; temp[1] = 0; temp[2] = 0;
+        cblas_dscal(3, 0.0, &temp[0], 1);
 
         // Calculating the distance between the normal vector to the face
         // and the vector from the face to the centroid.
@@ -394,17 +394,17 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         // i.e., TPFA term.
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 1, &k_L[0], 3, 1.0, &temp[0], 3);
         k_n_L = cblas_ddot(3, &temp[0], 1, &n_IJK[0], 1) / pow(face_area, 2);
-        temp[0] = 0; temp[1] = 0; temp[2] = 0;
+        cblas_dscal(3, 0.0, &temp[0], 1);
 
         // Same as <<N_IJK, K_L>, tan_JI> = trans(trans(N_IJK)*K_L)*tan_JI
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 1, &k_L[0], 3, 1.0, &temp[0], 3);
         k_L_JI = cblas_ddot(3, &temp[0], 1, &tan_JI[0], 1) / pow(face_area, 2);
-        temp[0] = 0; temp[1] = 0; temp[2] = 0;
+        cblas_dscal(3, 0.0, &temp[0], 1);
 
         // Same as <<N_IJK, K_L>, tan_JK> = trans(trans(N_IJK)*K_L)*tan_JK
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 1, &k_L[0], 3, 1.0, &temp[0], 3);
         k_L_JK = cblas_ddot(3, &temp[0], 1, &tan_JK[0], 1) / pow(face_area, 2);
-        temp[0] = 0; temp[1] = 0; temp[2] = 0;
+        cblas_dscal(3, 0.0, &temp[0], 1);
 
         d_JK = this->get_cross_diffusion_term(tan_JK, lj, face_area, h_L, k_n_L, k_L_JK, 0, 0, 0, true);
         d_JI = this->get_cross_diffusion_term(tan_JI, lj, face_area, h_L, k_n_L, k_L_JI, 0, 0, 0, true);
