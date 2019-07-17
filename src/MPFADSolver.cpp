@@ -469,14 +469,14 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         cblas_dcopy(3, &i[0], 1, &tan_JI[0], 1);  // tan_JI = i
         cblas_daxpy(3, -1, &j[0], 1, &tan_JI[0], 1);  // tan_JI = -j + tan_JI = -j + i
         this->cross_product(n_IJK, tan_JI, temp);    // tan_JI = n_IJK x tan_JI = n_IJK x (-j + i)
-        tan_JI[0] = temp[0]; tan_JI[1] = temp[1]; tan_JI[2] = temp[2];
+        cblas_dcopy(3, &temp[0], 1, &tan_JI[0], 1);
+        cblas_dscal(3, 0.0, &temp[0], 1);
 
         cblas_dcopy(3, &k[0], 1, &tan_JK[0], 1);
         cblas_daxpy(3, -1, &j[0], 1, &tan_JK[0], 1);
         this->cross_product(n_IJK, tan_JK, temp);
-        tan_JK[0] = temp[0]; tan_JK[1] = temp[1]; tan_JK[2] = temp[2];
-
-        temp[0] = 0; temp[1] = 0; temp[2] = 0;
+        cblas_dcopy(3, &temp[0], 1, &tan_JK[0], 1);
+        cblas_dscal(3, 0.0, &temp[0], 1);
 
         /* RIGHT VOLUME PERMEABILITY TERMS */
 
@@ -489,17 +489,17 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         // i.e., TPFA term of the right volume.
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 1, &k_R[0], 3, 1.0, &temp[0], 3);
         k_n_R = cblas_ddot(3, &temp[0], 1, &n_IJK[0], 1) / pow(face_area, 2);
-        temp[0] = 0; temp[1] = 0; temp[2] = 0;
+        cblas_dscal(3, 0.0, &temp[0], 1);
 
         // Same as <<N_IJK, K_R>, tan_JI> = trans(trans(N_IJK)*K_R)*tan_JI
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 1, &k_R[0], 3, 1.0, &temp[0], 3);
         k_R_JI = cblas_ddot(3, &temp[0], 1, &tan_JI[0], 1) / pow(face_area, 2);
-        temp[0] = 0; temp[1] = 0; temp[2] = 0;
+        cblas_dscal(3, 0.0, &temp[0], 1);
 
         // Same as <<N_IJK, K_R>, tan_JK> = trans(trans(N_IJK)*K_R)*tan_JK
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 1, &k_R[0], 3, 1.0, &temp[0], 3);
         k_R_JK = cblas_ddot(3, &temp[0], 1, &tan_JK[0], 1) / pow(face_area, 2);
-        temp[0] = 0; temp[1] = 0; temp[2] = 0;
+        cblas_dscal(3, 0.0, &temp[0], 1);
 
         /* --------------- */
 
@@ -514,17 +514,17 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         // i.e., TPFA term of the left volume.
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 1, &k_L[0], 3, 1.0, &temp[0], 3);
         k_n_L = cblas_ddot(3, &temp[0], 1, &n_IJK[0], 1) / pow(face_area, 2);
-        temp[0] = 0; temp[1] = 0; temp[2] = 0;
+        cblas_dscal(3, 0.0, &temp[0], 1);
 
         // Same as <<N_IJK, K_L>, tan_JI> = trans(trans(N_IJK)*K_L)*tan_JI
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 1, &k_L[0], 3, 1.0, &temp[0], 3);
         k_L_JI = cblas_ddot(3, &temp[0], 1, &tan_JI[0], 1) / pow(face_area, 2);
-        temp[0] = 0; temp[1] = 0; temp[2] = 0;
+        cblas_dscal(3, 0.0, &temp[0], 1);
 
         // Same as <<N_IJK, K_L>, tan_JK> = trans(trans(N_IJK)*K_L)*tan_JK
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &n_IJK[0], 1, &k_L[0], 3, 1.0, &temp[0], 3);
         k_L_JK = cblas_ddot(3, &temp[0], 1, &tan_JK[0], 1) / pow(face_area, 2);
-        temp[0] = 0; temp[1] = 0; temp[2] = 0;
+        cblas_dscal(3, 0.0, &temp[0], 1);
 
         /* --------------- */
 
