@@ -323,7 +323,6 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
 }
 
 void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range dirichlet_faces) {
-    ErrorCode rval;
     Range face_vertices, vols_sharing_face;
     int vol_id = -1;
     double face_area = 0.0, h_L = 0, k_n_L = 0, k_L_JI = 0, k_L_JK = 0,
@@ -338,10 +337,10 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
     vert_coords = (double*) calloc(9, sizeof(double));
 
     for (Range::iterator it = dirichlet_faces.begin(); it != dirichlet_faces.end(); ++it) {
-        rval = this->topo_util->get_bridge_adjacencies(*it, 2, 0, face_vertices);
-        rval = this->mb->get_coords(face_vertices, vert_coords);
-        rval = this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
-        rval = this->mb->tag_get_data(this->tags[dirichlet], face_vertices, &node_pressure);
+        this->topo_util->get_bridge_adjacencies(*it, 2, 0, face_vertices);
+        this->mb->get_coords(face_vertices, vert_coords);
+        this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
+        this->mb->tag_get_data(this->tags[dirichlet], face_vertices, &node_pressure);
 
         // Dividing vertices coordinate array into three points.
         i[0] = vert_coords[0]; i[1] = vert_coords[1]; i[2] = vert_coords[2];
@@ -350,7 +349,7 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 
         // Retrieving left volume centroid.
         EntityHandle left_volume = vols_sharing_face[0];
-        rval = this->mb->tag_get_data(this->tags[centroid], &left_volume, 1, &l);
+        this->mb->tag_get_data(this->tags[centroid], &left_volume, 1, &l);
 
         this->get_normal_vector(vert_coords, n_IJK);
         cblas_dscal(3, 0.5, &n_IJK[0], 1);
@@ -388,7 +387,7 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         // and the vector from the face to the centroid.
         h_L = fabs(cblas_ddot(3, &n_IJK[0], 1, &lj[0], 1)) / face_area;
 
-        rval = this->mb->tag_get_data(this->tags[permeability], &left_volume, 1, &k_L);
+        this->mb->tag_get_data(this->tags[permeability], &left_volume, 1, &k_L);
 
         // Calculating <<N_IJK, K_L>, N_IJK> = trans(trans(N_IJK)*K_L)*N_IJK,
         // i.e., TPFA term.
@@ -412,7 +411,7 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         k_eq = (face_area*k_n_L) / h_L;
         rhs = d_JK*(node_pressure[0] - node_pressure[1]) - k_eq*node_pressure[1] + d_JI*(node_pressure[1] - node_pressure[2]);
 
-        rval = this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &vol_id);
+        this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &vol_id);
         b[vol_id] -= rhs;
         A.InsertGlobalValues(vol_id, 1, &k_eq, &vol_id);
 
@@ -422,7 +421,6 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 }
 
 void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range internal_faces) {
-    ErrorCode rval;
     Range face_vertices, vols_sharing_face;
     double face_area = 0, d_JK = 0, d_JI = 0, k_eq = 0;
     double h_L = 0, k_n_L = 0, k_L_JI = 0, k_L_JK = 0;
@@ -437,9 +435,9 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
     tan_JI = (double*) calloc(3, sizeof(double));
 
     for (Range::iterator it = internal_faces.begin(); it != internal_faces.end(); ++it) {
-        rval = this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
-        rval = this->mb->get_coords(face_vertices, vert_coords);
-        rval = this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
+        this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
+        this->mb->get_coords(face_vertices, vert_coords);
+        this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
 
         // Dividing vertices coordinate array into three points.
         i[0] = vert_coords[0]; i[1] = vert_coords[1]; i[2] = vert_coords[2];
@@ -447,8 +445,8 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         k[0] = vert_coords[6]; k[1] = vert_coords[7]; k[2] = vert_coords[8];
 
         EntityHandle left_volume = vols_sharing_face[0], right_volume = vols_sharing_face[1];
-        rval = this->mb->tag_get_data(this->tags[centroid], &left_volume, 1, &l);
-        rval = this->mb->tag_get_data(this->tags[centroid], &right_volume, 1, &r);
+        this->mb->tag_get_data(this->tags[centroid], &left_volume, 1, &l);
+        this->mb->tag_get_data(this->tags[centroid], &right_volume, 1, &r);
 
         cblas_dcopy(3, &r[0], 1, &dist_LR[0], 1);  // dist_LR = R
         cblas_daxpy(3, -1, &l[0], 1, &dist_LR[0], 1);  // dist_LR = R - L
@@ -482,7 +480,7 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
 
         /* RIGHT VOLUME PERMEABILITY TERMS */
 
-        rval = this->mb->tag_get_data(this->tags[permeability], &right_volume, 1, &k_R);
+        this->mb->tag_get_data(this->tags[permeability], &right_volume, 1, &k_R);
         cblas_dcopy(3, &j[0], 1, &rj[0], 1);  // RJ = J
         cblas_daxpy(3, -1, &r[0], 1, &rj[0], 1);  // RJ = J - R
         h_R = fabs(cblas_ddot(3, &n_IJK[0], 1, &rj[0], 1)) / face_area; // h_R = <N_IJK, RJ> / |N_IJK|
@@ -507,7 +505,7 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
 
         /* LEFT VOLUME PERMEABILITY TERMS */
 
-        rval = this->mb->tag_get_data(this->tags[permeability], &left_volume, 1, &k_L);
+        this->mb->tag_get_data(this->tags[permeability], &left_volume, 1, &k_L);
         cblas_dcopy(3, &j[0], 1, &lj[0], 1);  // LJ = J
         cblas_daxpy(3, -1, &l[0], 1, &lj[0], 1);  // LJ = J - L
         h_L = fabs(cblas_ddot(3, &n_IJK[0], 1, &lj[0], 1)) / face_area; // h_L = <N_IJK, LJ> / |N_IJK|
@@ -536,8 +534,8 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         k_eq = (k_n_R * k_n_L / ((k_n_R * h_R) + (k_n_L * h_L))) * face_area;
 
         int id_left, id_right;
-        rval = this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &id_left);
-        rval = this->mb->tag_get_data(this->tags[global_id], &right_volume, 1, &id_right);
+        this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &id_left);
+        this->mb->tag_get_data(this->tags[global_id], &right_volume, 1, &id_right);
 
         // Node treatment goes here. It depends on the interpolation.
         this->node_treatment(face_vertices[0], id_left, id_right, k_eq, 0.0, d_JK, b);
