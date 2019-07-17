@@ -228,7 +228,6 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
         this->mb->tag_get_data(this->tags[source], &(*it), 1, &source_term);
         this->mb->tag_get_data(this->tags[global_id], &(*it), 1, &volume_id);
         b[volume_id] += source_term;
-        A.InsertGlobalValues(volume_id, 1, &source_term, &volume_id);
     }
 
     this->visit_neumann_faces(A, b, neumann_faces);
@@ -299,30 +298,28 @@ void MPFADSolver::node_treatment (EntityHandle node, int id_left, int id_right,
 }
 
 void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range neumann_faces) {
-    ErrorCode rval;
     Range vols_sharing_face, face_vertices;
     int vol_id = -1, i = 0;
     double face_area = 0.0, n_IJK[3];
 
     double *vert_coords = (double*) calloc(9, sizeof(double));
     double *faces_flow = (double*) calloc(neumann_faces.size(), sizeof(double));
-    rval = this->mb->tag_get_data(this->tags[neumann], neumann_faces, faces_flow);
-    if (rval != MB_SUCCESS) {
-        throw runtime_error("Unable to get Neumann BC");
-    }
+    this->mb->tag_get_data(this->tags[neumann], neumann_faces, faces_flow);
 
     for (Range::iterator it = neumann_faces.begin(); it != neumann_faces.end(); ++it, ++i) {
-        // TODO: Add exception treatment.
-        rval = this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
-        rval = this->mb->tag_get_data(this->tags[global_id], &(*vols_sharing_face.begin()), 1, &vol_id);
-        rval = this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
-        rval = this->mb->get_coords(face_vertices, vert_coords);
+        this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
+        this->mb->tag_get_data(this->tags[global_id], &(*vols_sharing_face.begin()), 1, &vol_id);
+        this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
+        this->mb->get_coords(face_vertices, vert_coords);
         this->get_normal_vector(vert_coords, n_IJK);
         cblas_dscal(3, 0.5, &n_IJK[0], 1);
         face_area = this->get_face_area(n_IJK);
         b[vol_id] -= faces_flow[i]*face_area;
         vols_sharing_face.clear();
     }
+
+    free(vert_coords);
+    free(faces_flow);
 }
 
 void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range dirichlet_faces) {
@@ -331,14 +328,14 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
     int vol_id = -1;
     double face_area = 0.0, h_L = 0, k_n_L = 0, k_L_JI = 0, k_L_JK = 0,
             d_JK = 0, d_JI = 0, k_eq = 0, rhs = 0;
-    double n_IJK[3], *tan_JI = NULL, *tan_JK = NULL;
+    double n_IJK[3], *tan_JI = NULL, *tan_JK = NULL, *vert_coords = NULL;
     double i[3], j[3], k[3], l[3], lj[3];
     double node_pressure[3], k_L[9], temp[3] = {0, 0, 0};
 
     tan_JI = (double*) calloc(3, sizeof(double));
     tan_JK = (double*) calloc(3, sizeof(double));
 
-    double *vert_coords = (double*) calloc(9, sizeof(double));
+    vert_coords = (double*) calloc(9, sizeof(double));
 
     for (Range::iterator it = dirichlet_faces.begin(); it != dirichlet_faces.end(); ++it) {
         rval = this->topo_util->get_bridge_adjacencies(*it, 2, 0, face_vertices);
@@ -355,22 +352,20 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         EntityHandle left_volume = vols_sharing_face[0];
         rval = this->mb->tag_get_data(this->tags[centroid], &left_volume, 1, &l);
 
-        // Calculating normal term.
         this->get_normal_vector(vert_coords, n_IJK);
         cblas_dscal(3, 0.5, &n_IJK[0], 1);
         face_area = this->get_face_area(n_IJK);
 
-        cblas_dcopy(3, &j[0], 1, &lj[0], 1);
-        cblas_daxpy(3, -1, &l[0], 1, &lj[0], 1);
+        cblas_dcopy(3, &j[0], 1, &lj[0], 1);    // LJ = J
+        cblas_daxpy(3, -1, &l[0], 1, &lj[0], 1);    // LJ = J - L
 
         // Checking if the normal vector is oriented outward.
         double _test = cblas_ddot(3, &lj[0], 1, &n_IJK[0], 1);
         if (_test < 0.0) {
-            k[0] = vert_coords[0]; k[1] = vert_coords[1]; k[2] = vert_coords[2];
-            i[0] = vert_coords[6]; i[1] = vert_coords[7]; i[2] = vert_coords[8];
+            std::swap(i, k);
             cblas_dscal(3, -1.0, &n_IJK[0], 1);
         }
-        else {  // Why does get_bridge_adjacencies swap reverses its order in C++?
+        else {  // Why does get_bridge_adjacencies reverses its order in C++?
             std::swap(node_pressure[0], node_pressure[2]);
         }
 
