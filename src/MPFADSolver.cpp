@@ -425,11 +425,13 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
     double face_area = 0, d_JK = 0, d_JI = 0, k_eq = 0;
     double h_L = 0, k_n_L = 0, k_L_JI = 0, k_L_JK = 0;
     double h_R = 0, k_n_R = 0, k_R_JI = 0, k_R_JK = 0;
-    double n_IJK[3], *tan_JI = NULL, *tan_JK = NULL;
+    double n_IJK[3], *tan_JI = NULL, *tan_JK = NULL, *vert_coords = NULL;
     double i[3], j[3], k[3], l[3], r[3], lj[3], rj[3], dist_LR[3];
     double k_L[9], k_R[9], temp[3] = {0, 0, 0};
+    int cols_ids[2];
+    double right_cols_values[2], left_cols_values[2];
 
-    double *vert_coords = (double*) calloc(9, sizeof(double));
+    vert_coords = (double*) calloc(9, sizeof(double));
 
     tan_JK = (double*) calloc(3, sizeof(double));
     tan_JI = (double*) calloc(3, sizeof(double));
@@ -542,10 +544,12 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         this->node_treatment(face_vertices[1], id_left, id_right, k_eq, d_JI, -d_JK, b);
         this->node_treatment(face_vertices[2], id_left, id_right, k_eq, -d_JI, 0.0, b);
 
-        A.InsertGlobalValues(id_right, 1, &k_eq, &id_right);
-        A.InsertGlobalValues(id_left, 1, &k_eq, &id_left); k_eq = -k_eq;
-        A.InsertGlobalValues(id_right, 1, &k_eq, &id_left);
-        A.InsertGlobalValues(id_left, 1, &k_eq, &id_right);
+        cols_ids[0] = id_right; cols_ids[1] = id_left;
+        right_cols_values[0] = k_eq; right_cols_values[1] = -k_eq;
+        left_cols_values[0] = -k_eq; left_cols_values[1] = k_eq;
+
+        A.InsertGlobalValues(id_right, 2, &right_cols_values[0], &cols_ids[0]);
+        A.InsertGlobalValues(id_left, 2, &left_cols_values[0], &cols_ids[0]);
 
         face_vertices.clear();
         vols_sharing_face.clear();
