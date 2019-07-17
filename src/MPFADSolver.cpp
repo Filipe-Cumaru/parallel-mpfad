@@ -228,7 +228,6 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
         this->mb->tag_get_data(this->tags[source], &(*it), 1, &source_term);
         this->mb->tag_get_data(this->tags[global_id], &(*it), 1, &volume_id);
         b[volume_id] += source_term;
-        // printf("[SOURCE TERM] Q[%d] += %lf\n", volume_id, source_term);
         A.InsertGlobalValues(volume_id, 1, &source_term, &volume_id);
     }
 
@@ -295,10 +294,8 @@ void MPFADSolver::node_treatment (EntityHandle node, int id_left, int id_right,
     double rhs = 0.5 * k_eq * (d_JK + d_JI);
     double pressure = 0.0;
     this->mb->tag_get_data(this->tags[dirichlet], &node, 1, &pressure);
-    b[id_left] += rhs*pressure;
-    b[id_right] -= rhs*pressure;
-    // printf("[INTERNAL] Q[%d] += %lf\n", id_left, rhs*pressure);
-    // printf("[INTERNAL] Q[%d] -= %lf\n", id_right, rhs*pressure);
+    b[id_left] -= rhs*pressure;
+    b[id_right] += rhs*pressure;
 }
 
 void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range neumann_faces) {
@@ -325,7 +322,6 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
         face_area = this->get_face_area(n_IJK);
         b[vol_id] -= faces_flow[i]*face_area;
         vols_sharing_face.clear();
-        printf("[NEUMANN] Q[%d] -= %lf\n", vol_id, faces_flow[i]*face_area);
     }
 }
 
@@ -423,7 +419,6 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 
         rval = this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &vol_id);
         b[vol_id] -= rhs;
-        printf("[DIRICHLET] Q[%d] -= %lf\n", vol_id, rhs);
         A.InsertGlobalValues(vol_id, 1, &k_eq, &vol_id);
 
         face_vertices.clear();
@@ -460,10 +455,22 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         rval = this->mb->tag_get_data(this->tags[centroid], &left_volume, 1, &l);
         rval = this->mb->tag_get_data(this->tags[centroid], &right_volume, 1, &r);
 
+        cblas_dcopy(3, &r[0], 1, &dist_LR[0], 1);  // dist_LR = R
+        cblas_daxpy(3, -1, &l[0], 1, &dist_LR[0], 1);  // dist_LR = R - L
+
         // Calculating normal term.
         this->get_normal_vector(vert_coords, n_IJK);
         cblas_dscal(3, 0.5, &n_IJK[0], 1);
         face_area = this->get_face_area(n_IJK);
+
+        double _test = cblas_ddot(3, &dist_LR[0], 1, &n_IJK[0], 1);
+        if (_test < 0.0) {
+            EntityHandle temp_handle = left_volume;
+            left_volume = right_volume;
+            right_volume = temp_handle;
+            std::swap(r, l);
+            cblas_dscal(3, -1, &dist_LR[0], 1);
+        }
 
         // Calculating tangential terms.
         cblas_dcopy(3, &i[0], 1, &tan_JI[0], 1);  // tan_JI = i
@@ -528,8 +535,6 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
 
         /* --------------- */
 
-        cblas_dcopy(3, &r[0], 1, &dist_LR[0], 1);  // dist_LR = R
-        cblas_daxpy(3, -1, &l[0], 1, &dist_LR[0], 1);  // dist_LR = R - L
         d_JI = this->get_cross_diffusion_term(tan_JI, dist_LR, face_area, h_L, k_n_L, k_L_JI, h_R, k_n_R, k_R_JI, false);
         d_JK = this->get_cross_diffusion_term(tan_JK, dist_LR, face_area, h_L, k_n_L, k_L_JK, h_R, k_n_R, k_R_JK, false);
 
