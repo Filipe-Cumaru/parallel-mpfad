@@ -2,6 +2,7 @@
 MPFADSolver
 makefile*
 mesh_files
+partial_results
 *.o
 *.h5m
 *.png
