@@ -34,11 +34,15 @@ class LPEW3 {
 private:
     Interface *mb;
     MeshTopoUtil *topo_util;
-    Tag tags[7];
+    Tag dirichlet_tag;
+    Tag neumann_tag;
+    Tag centroid_tag;
+    Tag permeability_tag;
     double tau;
 public:
     LPEW3 ();
     LPEW3 (Interface *moab_interface);
+    LPEW3 (Interface *moab_interface, double tau_value);
     void interpolate (EntityHandle node, bool is_neumann, std::map<EntityHandle, double>& weights);
 private:
     double neumann_treatment (EntityHandle node);
@@ -50,6 +54,7 @@ private:
     double get_neta (EntityHandle node, EntityHandle volume, EntityHandle face);
     double get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle face);
     double get_flux_term (double v1[3], double k[9], double v2[3], double face_area);
+    void init_tags ();
 };
 
 #endif
