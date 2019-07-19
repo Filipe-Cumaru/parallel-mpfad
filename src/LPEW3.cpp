@@ -47,7 +47,13 @@ double LPEW3::get_neta (EntityHandle node, EntityHandle volume, EntityHandle fac
 }
 
 double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle face) {
-    Range adj_vols, face_nodes, ref_node;
+    Range adj_vols, face_nodes, ref_node, vol_nodes, ref_node_i;
+    double *face_nodes_coords = (double*) calloc(9, sizeof(double));
+    double *ref_node_coords = (double*) calloc(3, sizeof(double));
+    double *aux_node_coords = (double*) calloc(3, sizeof(double));
+    double *node_coords = (double*) calloc(3, sizeof(double));
+    double *ref_node_i_coords = (double*) calloc(3, sizeof(double));
+    double lambda_sum = 0.0, k[9], vol_centroid[3];
 
     this->mtu->get_bridge_adjacencies(face, 2, 3, adj_vols);
     this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
@@ -56,7 +62,30 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
     face_nodes.erase(node);
     face_nodes.erase(aux_node);
 
-    return 0.0;
+    this->mb->get_coords(face_nodes, face_nodes_coords);
+    this->mb->get_coords(ref_node, ref_node_coords);
+    this->mb->get_coords(&aux_node, 1, aux_node_coords);
+    this->mb->get_coords(&node, 1, node_coords);
+
+    for (Range::iterator it = adj_vols.begin(); it != adj_vols.end(); ++it) {
+        this->mb->tag_get_data(this->permeability_tag, &(*it), 1, &k);
+        this->mb->tag_get_data(this->centroid_tag, &(*it), 1, &vol_centroid);
+        this->mb->get_adjacencies(&(*it), 1, 0, false, vol_nodes);
+        // Calculate volume of the tetrahedron with vertices face_nodes and vol_centroid.
+        ref_node_i = subtract(vol_nodes, face_nodes);
+        this->mb->get_coords(ref_node_i, ref_node_i_coords);
+        // Add routines to cross product, area and normal vector.
+        vol_nodes.clear();
+        ref_node_i.clear();
+    }
+
+    free(face_nodes_coords);
+    free(ref_node_coords);
+    free(aux_node_coords);
+    free(node_coords);
+    free(ref_node_i_coords);
+
+    return lambda_sum;
 }
 
 double LPEW3::get_flux_term (double v1[3], double k[9], double v2[3], double face_area) {
