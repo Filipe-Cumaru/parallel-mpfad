@@ -3,19 +3,16 @@
 using namespace std;
 using namespace moab;
 
+// NOTE: When implementing super class, remember to add a constructor that
+// accepts a value for tau.
+
 LPEW3::LPEW3 () : mb (new Core()),
                 topo_util (new MeshTopoUtil(mb)),
-                tau (1.0) {}
+                tau (0.0) {}
 
 LPEW3::LPEW3 (Interface *moab_interface) : mb (moab_interface),
                                         topo_util (new MeshTopoUtil(mb)),
-                                        tau (1.0) {}
-
-// REVIEW: The LPEW3 is defined for tau = 1. This constructor should
-// be implemented in a super class.
-LPEW3::LPEW3 (Interface *moab_interface, double tau_value) : mb (moab_interface),
-                                                            topo_util (new MeshTopoUtil(mb)),
-                                                            tau (tau_value) {}
+                                        tau (0.0) {}
 
 void LPEW3::interpolate (EntityHandle node, bool is_neumann, std::map<EntityHandle, double>& weights) {
     return;
@@ -50,6 +47,15 @@ double LPEW3::get_neta (EntityHandle node, EntityHandle volume, EntityHandle fac
 }
 
 double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle face) {
+    Range adj_vols, face_nodes, ref_node;
+
+    this->mtu->get_bridge_adjacencies(face, 2, 3, adj_vols);
+    this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
+
+    // face_nodes = face_nodes - (node U aux_node)
+    face_nodes.erase(node);
+    face_nodes.erase(aux_node);
+
     return 0.0;
 }
 

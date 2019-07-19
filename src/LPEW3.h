@@ -42,7 +42,6 @@ private:
 public:
     LPEW3 ();
     LPEW3 (Interface *moab_interface);
-    LPEW3 (Interface *moab_interface, double tau_value);
     void interpolate (EntityHandle node, bool is_neumann, std::map<EntityHandle, double>& weights);
 private:
     double neumann_treatment (EntityHandle node);
