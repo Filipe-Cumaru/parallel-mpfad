@@ -31,4 +31,22 @@ namespace geoutils {
     double get_face_area (double n[3]) {
         return sqrt(cblas_ddot(3, &n[0], 1, &n[0], 1));
     }
+
+    /*
+        Calculate the volume of a tetrahedron.
+    */
+    double get_tetra_volume (double vert_coords[12]) {
+        double v1[3] = { vert_coords[3] - vert_coords[0],
+            vert_coords[4] - vert_coords[1], vert_coords[5] - vert_coords[2] };
+        double v2[3] = { vert_coords[6] - vert_coords[0],
+            vert_coords[7] - vert_coords[1], vert_coords[8] - vert_coords[2] };
+        double v3[3] = { vert_coords[9] - vert_coords[0],
+            vert_coords[10] - vert_coords[1], vert_coords[11] - vert_coords[2] };
+        double temp[3], volume = 0.0;
+
+        geoutils::cross_product(v1, v2, temp);
+        volume = fabs(cblas_ddot(3, &temp[0], 1, &v3[0], 1)) / 6.0;
+
+        return volume;
+    }
 }

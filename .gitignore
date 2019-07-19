@@ -6,6 +6,6 @@ partial_results
 *.o
 *.h5m
 *.png
-main.cpp
+main*
 mesh_adaptor.py
 mpfad_ricardo.py
