@@ -60,7 +60,7 @@ namespace geoutils {
     }
 
     void normal_vector (double i[3], double j[3], double k[3], double ref[3], double n[3]) {
-        double ref_vector[3];
+        double ab[3], ac[3], ref_vector[3];
 
         cblas_dcopy(3, &ref[0], 1, &ref_vector[0], 1);
         cblas_dscal(3, -1.0, &ref_vector[0], 1);
