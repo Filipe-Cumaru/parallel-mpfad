@@ -35,6 +35,8 @@
 /* MPI header */
 #include <mpi.h>
 
+#include "geoutils.h"
+
 using namespace std;
 using namespace moab;
 
@@ -45,7 +47,7 @@ enum TagsID {global_id, permeability, centroid, dirichlet,
 class MPFADSolver {
 private:
     Interface *mb;
-    MeshTopoUtil *topo_util;
+    MeshTopoUtil *mtu;
     ParallelComm *pcomm;
     Tag tags[7];
 public:

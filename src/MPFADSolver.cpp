@@ -5,11 +5,11 @@ using namespace moab;
 
 MPFADSolver::MPFADSolver () : mb(new Core()),
                             pcomm(new ParallelComm(mb, MPI_COMM_WORLD)),
-                            topo_util(new MeshTopoUtil(mb)) {}
+                            mtu(new MeshTopoUtil(mb)) {}
 
 MPFADSolver::MPFADSolver (Interface* moab_interface) : mb(moab_interface),
                                                 pcomm(new ParallelComm(mb, MPI_COMM_WORLD)),
-                                                topo_util(new MeshTopoUtil(mb)) {}
+                                                mtu(new MeshTopoUtil(mb)) {}
 
 void MPFADSolver::run () {
     /*
@@ -248,24 +248,6 @@ void MPFADSolver::set_pressure_tags (Epetra_Vector& X, Range& volumes) {
     }
 }
 
-void MPFADSolver::cross_product(double u[3], double v[3], double n[3]) {
-    n[0] = u[1]*v[2] - u[2]*v[1];
-    n[1] = u[2]*v[0] - u[0]*v[2];
-    n[2] = u[0]*v[1] - u[1]*v[0];
-}
-
-void MPFADSolver::get_normal_vector (double vert_coords[9], double n[3]) {
-    double ab[3] = { vert_coords[3] - vert_coords[0],
-        vert_coords[4] - vert_coords[1], vert_coords[5] - vert_coords[2] };
-    double ac[3] = { vert_coords[6] - vert_coords[0],
-        vert_coords[7] - vert_coords[1], vert_coords[8] - vert_coords[2] };
-    this->cross_product(ab, ac, n);
-}
-
-double MPFADSolver::get_face_area (double n[3]) {
-    return sqrt(cblas_ddot(3, &n[0], 1, &n[0], 1));
-}
-
 double MPFADSolver::get_cross_diffusion_term (double tan[3], double vec[3], double s,
                                               double h1, double Kn1, double Kt1,
                                               double h2, double Kn2, double Kt2,
@@ -307,13 +289,13 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
     this->mb->tag_get_data(this->tags[neumann], neumann_faces, faces_flow);
 
     for (Range::iterator it = neumann_faces.begin(); it != neumann_faces.end(); ++it, ++i) {
-        this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
+        this->mtu->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
         this->mb->tag_get_data(this->tags[global_id], &(*vols_sharing_face.begin()), 1, &vol_id);
         this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
         this->mb->get_coords(face_vertices, vert_coords);
-        this->get_normal_vector(vert_coords, n_IJK);
+        geoutils::get_normal_vector(vert_coords, n_IJK);
         cblas_dscal(3, 0.5, &n_IJK[0], 1);
-        face_area = this->get_face_area(n_IJK);
+        face_area = geoutils::get_face_area(n_IJK);
         b[vol_id] -= faces_flow[i]*face_area;
         vols_sharing_face.clear();
     }
@@ -337,9 +319,9 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
     vert_coords = (double*) calloc(9, sizeof(double));
 
     for (Range::iterator it = dirichlet_faces.begin(); it != dirichlet_faces.end(); ++it) {
-        this->topo_util->get_bridge_adjacencies(*it, 2, 0, face_vertices);
+        this->mtu->get_bridge_adjacencies(*it, 2, 0, face_vertices);
         this->mb->get_coords(face_vertices, vert_coords);
-        this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
+        this->mtu->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
         this->mb->tag_get_data(this->tags[dirichlet], face_vertices, &node_pressure);
 
         // Dividing vertices coordinate array into three points.
@@ -351,9 +333,9 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         EntityHandle left_volume = vols_sharing_face[0];
         this->mb->tag_get_data(this->tags[centroid], &left_volume, 1, &l);
 
-        this->get_normal_vector(vert_coords, n_IJK);
+        geoutils::get_normal_vector(vert_coords, n_IJK);
         cblas_dscal(3, 0.5, &n_IJK[0], 1);
-        face_area = this->get_face_area(n_IJK);
+        face_area = geoutils::get_face_area(n_IJK);
 
         cblas_dcopy(3, &j[0], 1, &lj[0], 1);    // LJ = J
         cblas_daxpy(3, -1, &l[0], 1, &lj[0], 1);    // LJ = J - L
@@ -373,12 +355,12 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         // as the original code sugests.
         cblas_dcopy(3, &k[0], 1, &tan_JI[0], 1);  // tan_JI = i
         cblas_daxpy(3, -1, &j[0], 1, &tan_JI[0], 1);  // tan_JI = -j + tan_JI = i - j
-        this->cross_product(n_IJK, tan_JI, temp);    // tan_JI = n_IJK x tan_JI = n_IJK x (i - j)
+        geoutils::cross_product(n_IJK, tan_JI, temp);    // tan_JI = n_IJK x tan_JI = n_IJK x (i - j)
         cblas_dcopy(3, &temp[0], 1, &tan_JI[0], 1);
 
         cblas_dcopy(3, &i[0], 1, &tan_JK[0], 1);
         cblas_daxpy(3, -1, &j[0], 1, &tan_JK[0], 1);
-        this->cross_product(n_IJK, tan_JK, temp);
+        geoutils::cross_product(n_IJK, tan_JK, temp);
         cblas_dcopy(3, &temp[0], 1, &tan_JK[0], 1);
 
         cblas_dscal(3, 0.0, &temp[0], 1);
@@ -439,7 +421,7 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
     for (Range::iterator it = internal_faces.begin(); it != internal_faces.end(); ++it) {
         this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
         this->mb->get_coords(face_vertices, vert_coords);
-        this->topo_util->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
+        this->mtu->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
 
         // Dividing vertices coordinate array into three points.
         i[0] = vert_coords[0]; i[1] = vert_coords[1]; i[2] = vert_coords[2];
@@ -454,9 +436,9 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         cblas_daxpy(3, -1, &l[0], 1, &dist_LR[0], 1);  // dist_LR = R - L
 
         // Calculating normal term.
-        this->get_normal_vector(vert_coords, n_IJK);
+        geoutils::get_normal_vector(vert_coords, n_IJK);
         cblas_dscal(3, 0.5, &n_IJK[0], 1);
-        face_area = this->get_face_area(n_IJK);
+        face_area = geoutils::get_face_area(n_IJK);
 
         double _test = cblas_ddot(3, &dist_LR[0], 1, &n_IJK[0], 1);
         if (_test < 0.0) {
@@ -470,13 +452,13 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         // Calculating tangential terms.
         cblas_dcopy(3, &i[0], 1, &tan_JI[0], 1);  // tan_JI = i
         cblas_daxpy(3, -1, &j[0], 1, &tan_JI[0], 1);  // tan_JI = -j + tan_JI = -j + i
-        this->cross_product(n_IJK, tan_JI, temp);    // tan_JI = n_IJK x tan_JI = n_IJK x (-j + i)
+        geoutils::cross_product(n_IJK, tan_JI, temp);    // tan_JI = n_IJK x tan_JI = n_IJK x (-j + i)
         cblas_dcopy(3, &temp[0], 1, &tan_JI[0], 1);
         cblas_dscal(3, 0.0, &temp[0], 1);
 
         cblas_dcopy(3, &k[0], 1, &tan_JK[0], 1);
         cblas_daxpy(3, -1, &j[0], 1, &tan_JK[0], 1);
-        this->cross_product(n_IJK, tan_JK, temp);
+        geoutils::cross_product(n_IJK, tan_JK, temp);
         cblas_dcopy(3, &temp[0], 1, &tan_JK[0], 1);
         cblas_dscal(3, 0.0, &temp[0], 1);
 

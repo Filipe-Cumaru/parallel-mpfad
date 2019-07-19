@@ -27,13 +27,15 @@
 /* MPI header */
 #include <mpi.h>
 
+#include "geoutils.h"
+
 using namespace std;
 using namespace moab;
 
 class LPEW3 {
 private:
     Interface *mb;
-    MeshTopoUtil *topo_util;
+    MeshTopoUtil *mtu;
     Tag dirichlet_tag;
     Tag neumann_tag;
     Tag centroid_tag;

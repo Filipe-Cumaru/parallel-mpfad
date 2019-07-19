@@ -7,11 +7,11 @@ using namespace moab;
 // accepts a value for tau.
 
 LPEW3::LPEW3 () : mb (new Core()),
-                topo_util (new MeshTopoUtil(mb)),
+                mtu (new MeshTopoUtil(mb)),
                 tau (0.0) {}
 
 LPEW3::LPEW3 (Interface *moab_interface) : mb (moab_interface),
-                                        topo_util (new MeshTopoUtil(mb)),
+                                        mtu (new MeshTopoUtil(mb)),
                                         tau (0.0) {}
 
 void LPEW3::interpolate (EntityHandle node, bool is_neumann, std::map<EntityHandle, double>& weights) {
