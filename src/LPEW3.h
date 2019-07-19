@@ -11,6 +11,7 @@
 #include <string>
 #include <stdexcept>
 #include <utility>  /* std::swap */
+#include <algorithm>    /* std::copy */
 #include <map>
 
 /* MOAB includes */

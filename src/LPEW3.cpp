@@ -53,7 +53,8 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
     double *aux_node_coords = (double*) calloc(3, sizeof(double));
     double *node_coords = (double*) calloc(3, sizeof(double));
     double *ref_node_i_coords = (double*) calloc(3, sizeof(double));
-    double lambda_sum = 0.0, k[9], vol_centroid[3];
+    double lambda_sum = 0.0, tetra_vol = 0.0, k[9], vol_centroid[3], sub_vol[12],
+        n_int[3], n_i[3];
 
     this->mtu->get_bridge_adjacencies(face, 2, 3, adj_vols);
     this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
@@ -71,10 +72,19 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
         this->mb->tag_get_data(this->permeability_tag, &(*it), 1, &k);
         this->mb->tag_get_data(this->centroid_tag, &(*it), 1, &vol_centroid);
         this->mb->get_adjacencies(&(*it), 1, 0, false, vol_nodes);
-        // Calculate volume of the tetrahedron with vertices face_nodes and vol_centroid.
+
+        std::copy(face_nodes_coords, face_nodes_coords + 9, sub_vol);
+        std::copy(vol_centroid, vol_centroid + 3, sub_vol + 9);
+        tetra_vol = geoutils::get_tetra_volume(sub_vol);
+
         ref_node_i = subtract(vol_nodes, face_nodes);
         this->mb->get_coords(ref_node_i, ref_node_i_coords);
-        // Add routines to cross product, area and normal vector.
+
+        geoutils::normal_vector(node_coords, aux_node_coords, vol_centroid, ref_node_coords, n_int);
+        geoutils::normal_vector(face_nodes_coords, ref_node_i_coords, n_i);
+
+        lambda_sum += this->flux_term(n_i, k, n_int);
+
         vol_nodes.clear();
         ref_node_i.clear();
     }
