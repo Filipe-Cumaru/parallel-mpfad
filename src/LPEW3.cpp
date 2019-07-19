@@ -75,7 +75,7 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
 
         std::copy(face_nodes_coords, face_nodes_coords + 9, sub_vol);
         std::copy(vol_centroid, vol_centroid + 3, sub_vol + 9);
-        tetra_vol = geoutils::get_tetra_volume(sub_vol);
+        tetra_vol = geoutils::tetra_volume(sub_vol);
 
         ref_node_i = subtract(vol_nodes, face_nodes);
         this->mb->get_coords(ref_node_i, ref_node_i_coords);
@@ -83,7 +83,7 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
         geoutils::normal_vector(node_coords, aux_node_coords, vol_centroid, ref_node_coords, n_int);
         geoutils::normal_vector(face_nodes_coords, ref_node_i_coords, n_i);
 
-        lambda_sum += this->flux_term(n_i, k, n_int);
+        lambda_sum += this->get_flux_term(n_i, k, n_int, 1.0) / tetra_vol;
 
         vol_nodes.clear();
         ref_node_i.clear();
