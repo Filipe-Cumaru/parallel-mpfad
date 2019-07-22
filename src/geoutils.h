@@ -16,6 +16,7 @@ namespace geoutils {
     void normal_vector (double vert_coords[9], double n[3]);
     void normal_vector (double vert_coords[9], double ref[3], double n[3]);
     void normal_vector (double i[3], double j[3], double k[3], double ref[3], double n[3]);
+    void normal_vector (double vert_coords[9], double ref[3], bool *spin);
     double face_area (double n[3]);
     double tetra_volume (double vert_coords[12]);
 }

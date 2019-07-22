@@ -59,6 +59,29 @@ namespace geoutils {
         }
     }
 
+    void normal_vector (double vert_coords[9], double ref[3], bool *spin) {
+        double ab[3], ac[3], ref_vector[3], n[3];
+
+        cblas_dcopy(3, &ref[0], 1, &ref_vector[0], 1);
+        cblas_dscal(3, -1.0, &ref_vector[0], 1);
+        cblas_daxpy(3, 1, &vert_coords[0], 1, &ref_vector[0], 1);
+
+        cblas_dcopy(3, &vert_coords[0], 1, &ab[0], 1);
+        cblas_dscal(3, -1.0, &ab[0], 1);
+        cblas_daxpy(3, 1, &vert_coords[3], 1, &ab[0], 1);
+
+        cblas_dcopy(3, &vert_coords[0], 1, &ac[0], 1);
+        cblas_dscal(3, -1.0, &ac[0], 1);
+        cblas_daxpy(3, 1, &vert_coords[6], 1, &ac[0], 1);
+
+        geoutils::cross_product(ab, ac, n);
+
+        double vector_orientation = cblas_ddot(3, &n[0], 1, &ref_vector[0], 1);
+        if (vector_orientation < 0.0) {
+            *spin = true;
+        }
+    }
+
     void normal_vector (double i[3], double j[3], double k[3], double ref[3], double n[3]) {
         double ab[3], ac[3], ref_vector[3];
 
