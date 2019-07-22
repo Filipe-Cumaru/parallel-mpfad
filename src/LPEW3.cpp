@@ -35,12 +35,20 @@ double LPEW3::get_partial_weight (EntityHandle node, EntityHandle volume) {
         this->mtu->get_bridge_adjacencies(*it, 2, 3, face_neigh);
         face_neigh.erase(volume);
         csi = this->get_csi(*it, volume);
-        psi_sum_neigh = this->get_psi_sum(node, face_neigh[0], *it);
+        // In case it is a boundary volume.
+        if (!face_neigh.empty()) {
+            psi_sum_neigh = this->get_psi_sum(node, face_neigh[0], *it);
+            phi_neigh = this->get_phi(node, face_neigh[0], *it);
+        }
+        else {
+            psi_sum_neigh = 0.0;
+            phi_neigh = 0.0;
+        }
         psi_sum_vol = this->get_psi_sum(node, volume, *it);
-        phi_neigh = this->get_phi(node, face_neigh[0], *it);
         phi_vol = this->get_phi(node, volume, *it);
         zepta += (psi_sum_vol + psi_sum_neigh) * csi;
         delta += (phi_vol + phi_neigh) * csi;
+        face_neigh.clear();
     }
 
     partial_weight = zepta - delta;
