@@ -15,7 +15,24 @@ LPEW3::LPEW3 (Interface *moab_interface) : mb (moab_interface),
                                         tau (0.0) {}
 
 void LPEW3::interpolate (EntityHandle node, bool is_neumann, std::map<EntityHandle, double>& weights) {
-    return;
+    Range vols_around;
+    double p_weight, p_weight_sum = 0.0, neu_term;
+
+    this->mtu->get_bridge_adjacencies(node, 0, 3, vols_around);
+    for (Range::iterator it = vols_around.begin(); it != vols_around.end(); ++it) {
+        p_weight = this->get_partial_weight(node, *it);
+        p_weight_sum += p_weight;
+        weights.insert(std::pair<EntityHandle, double>(*it, p_weight));
+    }
+
+    for (Range::iterator it = vols_around.begin(); it != vols_around.end(); ++it) {
+        weights[*it] /= p_weight_sum;
+    }
+
+    if (is_neumann) {
+        neu_term = this->neumann_treatment(node) / p_weight_sum;
+        weights.insert(std::pair<EntityHandle, double>(node, neu_term));
+    }
 }
 
 double LPEW3::neumann_treatment (EntityHandle node) {
