@@ -23,7 +23,29 @@ double LPEW3::neumann_treatment (EntityHandle node) {
 }
 
 double LPEW3::get_partial_weight (EntityHandle node, EntityHandle volume) {
-    return 0.0;
+    Range vol_faces, adj_faces, vol_node_faces, face_neigh;
+    double partial_weight = 0.0, zepta = 0.0, delta = 0.0, csi = 0.0,
+        psi_sum_neigh = 0.0, psi_sum_vol = 0.0, phi_neigh = 0.0, phi_vol = 0.0;
+
+    this->mtu->get_bridge_adjacencies(volume, 3, 2, vol_faces);
+    this->mtu->get_bridge_adjacencies(node, 0, 2, adj_faces);
+    vol_node_faces = intersect(vol_faces, adj_faces);
+
+    for (Range::iterator it = vol_node_faces.begin(); it != vol_node_faces.end(); ++it) {
+        this->mtu->get_bridge_adjacencies(*it, 2, 3, face_neigh);
+        face_neigh.erase(volume);
+        csi = this->get_csi(*it, volume);
+        psi_sum_neigh = this->get_psi_sum(node, face_neigh[0], *it);
+        psi_sum_vol = this->get_psi_sum(node, volume, *it);
+        phi_neigh = this->get_phi(node, face_neigh[0], *it);
+        phi_vol = this->get_phi(node, volume, *it);
+        zepta += (psi_sum_vol + psi_sum_neigh) * csi;
+        delta += (phi_vol + phi_neigh) * csi;
+    }
+
+    partial_weight = zepta - delta;
+
+    return partial_weight;
 }
 
 double LPEW3::get_psi_sum (EntityHandle node, EntityHandle volume, EntityHandle face) {
