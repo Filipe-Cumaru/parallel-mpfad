@@ -43,7 +43,40 @@ double LPEW3::get_csi (EntityHandle face, EntityHandle volume) {
 }
 
 double LPEW3::get_neta (EntityHandle node, EntityHandle volume, EntityHandle face) {
-    return 0.0;
+    Range vol_nodes, face_nodes, ref_node;
+    double *vol_nodes_coords = (double*) calloc(12, sizeof(double));
+    double *face_nodes_coords = (double*) calloc(9, sizeof(double));
+    double *face_nodes_i_coords = (double*) calloc(9, sizeof(double));
+    double *node_coords = (double*) calloc(9, sizeof(double));
+    double *ref_node_coords = (double*) calloc(3, sizeof(double));
+    double k[9], n_out[3], n_i[3], tetra_vol = 0.0, neta = 0.0;
+
+    this->mb->get_adjacencies(&volume, 1, 0, false, vol_nodes);
+    this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
+    ref_node = subtract(vol_nodes, face_nodes);
+
+    this->mb->get_coords(vol_nodes, vol_nodes_coords);
+    this->mb->get_coords(face_nodes, face_nodes_coords);
+    this->mb->get_coords(ref_node, ref_node_coords);
+    this->mb->get_coords(&node, 1, node_coords);
+
+    vol_nodes.erase(node);
+    this->mb->get_coords(vol_nodes, face_nodes_i_coords);
+
+    geoutils::normal_vector(face_nodes_i_coords, node_coords, n_out);
+    geoutils::normal_vector(face_nodes_coords, ref_node_coords, n_i);
+    tetra_vol = geoutils::tetra_volume(vol_nodes_coords);
+
+    this->mb->tag_get_data(this->permeability_tag, &volume, 1, &k);
+    neta = this->get_flux_term(n_out, k, n_i, 1.0) / tetra_vol;
+
+    free(vol_nodes_coords);
+    free(face_nodes_coords);
+    free(face_nodes_i_coords);
+    free(node_coords);
+    free(ref_node_coords);
+
+    return neta;
 }
 
 double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle face) {
