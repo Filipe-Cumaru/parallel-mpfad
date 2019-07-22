@@ -80,6 +80,9 @@ namespace geoutils {
         if (vector_orientation < 0.0) {
             *spin = true;
         }
+        else {
+            *spin = false;
+        }
     }
 
     void normal_vector (double i[3], double j[3], double k[3], double ref[3], double n[3]) {
