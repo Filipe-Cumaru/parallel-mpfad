@@ -31,7 +31,26 @@ double LPEW3::get_psi_sum (EntityHandle node, EntityHandle volume, EntityHandle 
 }
 
 double LPEW3::get_phi (EntityHandle node, EntityHandle volume, EntityHandle face) {
-    return 0.0;
+    Range face_nodes, adj_faces, vol_faces, vol_nodes, aux_node, faces;
+    double phi = 0.0, lambda_mult = 1.0, sigma = 1.0, neta = 0.0;
+
+    this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
+    this->mb->get_adjacencies(&volume, 1, 0, false, vol_nodes);
+    aux_node = subtract(vol_nodes, face_nodes);
+    this->mtu->get_bridge_adjacencies(node, 0, 2, adj_faces);
+    this->mtu->get_bridge_adjacencies(volume, 3, 2, vol_faces);
+    faces = intersect(adj_faces, vol_faces);
+    faces.erase(face);
+
+    for (Range::iterator it = faces.begin(); it != faces.end(); ++it) {
+        lambda_mult *= this->get_lambda(node, aux_node[0], *it);
+    }
+    neta = this->get_neta(node, volume, face);
+    sigma = this->get_sigma(node, volume);
+
+    phi = lambda_mult * neta / sigma;
+
+    return phi;
 }
 
 double LPEW3::get_sigma (EntityHandle node, EntityHandle volume) {
