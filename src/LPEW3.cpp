@@ -19,7 +19,34 @@ void LPEW3::interpolate (EntityHandle node, bool is_neumann, std::map<EntityHand
 }
 
 double LPEW3::neumann_treatment (EntityHandle node) {
-    return 0.0;
+    Range adj_faces, neumann_faces, face_nodes, neu_vol;
+    double *face_nodes_coords = (double*) calloc(9, sizeof(double));
+    double neu_term_sum = 0.0, neu_term = 0.0, face_flux = 0.0, n[3], neu_psi,
+        neu_phi, face_area;
+
+    this->mtu->get_bridge_adjacencies(node, 0, 2, adj_faces);
+    this->mb->get_entities_by_type_and_tag(0, MBTRI, &this->neumann_tag, NULL,
+        1, neumann_faces);
+    adj_faces = intersect(adj_faces, neumann_faces);
+
+    for (Range::iterator it  = adj_faces.begin(); it != adj_faces.end(); ++it) {
+        this->mb->tag_get_data(this->neumann_tag, &(*it), 1, &face_flux);
+        this->mb->get_adjacencies(&(*it), 1, 0, false, face_nodes);
+        this->mb->get_coords(face_nodes, face_nodes_coords);
+        geoutils::normal_vector(face_nodes_coords, n);
+        face_area = geoutils::face_area(n);
+        this->mtu->get_bridge_adjacencies(*it, 2, 3, neu_vol);
+        neu_psi = this->get_psi_sum(node, neu_vol[0], *it);
+        neu_phi = this->get_phi(node, neu_vol[0], *it);
+        neu_term = -3.0 * (1 + neu_psi - neu_phi) * face_flux * face_area;
+        neu_term_sum += neu_term;
+        face_nodes.clear();
+        neu_vol.clear();
+    }
+
+    free(face_nodes_coords);
+
+    return neu_term_sum;
 }
 
 double LPEW3::get_partial_weight (EntityHandle node, EntityHandle volume) {
