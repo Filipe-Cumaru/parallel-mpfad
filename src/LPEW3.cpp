@@ -27,7 +27,32 @@ double LPEW3::get_partial_weight (EntityHandle node, EntityHandle volume) {
 }
 
 double LPEW3::get_psi_sum (EntityHandle node, EntityHandle volume, EntityHandle face) {
-    return 0.0;
+    Range face_nodes, vol_nodes, aux_node, adj_faces, vol_faces, faces,
+        a_face_nodes, other_node;
+    double psi_sum = 0.0, lambda1 = 0.0, lambda2 = 0.0, neta = 0.0, sigma = 0.0;
+
+    this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
+    this->mb->get_adjacencies(&volume, 1, 0, false, vol_nodes);
+    aux_node = subtract(vol_nodes, face_nodes);
+
+    this->mtu->get_bridge_adjacencies(node, 0, 2, adj_faces);
+    this->mtu->get_bridge_adjacencies(node, 3, 2, vol_faces);
+    faces = intersect(adj_faces, vol_faces);
+    faces.erase(face);
+
+    int num_faces = faces.size(), j = num_faces - 1;
+    for (int i = 0; i < num_faces; i++, (++j) % num_faces) {
+        this->mtu-> get_bridge_adjacencies(faces[i], 2, 0, a_face_nodes);
+        other_node = subtract(face_nodes, a_face_nodes);
+        lambda1 = this->get_lambda(node, aux_node[0], faces[i]);
+        lambda2 = this->get_lambda(node, other_node[0], faces[j]);
+        neta = this->get_neta(node, volume, faces[i]);
+        psi_sum += lambda1*lambda2*neta;
+    }
+    sigma = this->get_sigma(node, volume);
+    psi_sum /= sigma;
+
+    return psi_sum;
 }
 
 double LPEW3::get_phi (EntityHandle node, EntityHandle volume, EntityHandle face) {
