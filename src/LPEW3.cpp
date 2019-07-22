@@ -35,7 +35,41 @@ double LPEW3::get_phi (EntityHandle node, EntityHandle volume, EntityHandle face
 }
 
 double LPEW3::get_sigma (EntityHandle node, EntityHandle volume) {
-    return 0.0;
+    Range vol_faces, adj_faces, in_faces, aux_nodes;
+    double *node_coords = (double*) calloc(3, sizeof(double));
+    double *aux_nodes_coords = (double*) calloc(6, sizeof(double));
+    double sigma = 0.0, vol_centroid[3], clockwise = 1.0, counter_clockwise = 1.0,
+        aux_vector[9], count = 0.0, clock = 0.0;
+    bool spin = false;
+    int index = 0;
+
+    this->mtu->get_bridge_adjacencies(node, 0, 2, adj_faces);
+    this->mtu->get_bridge_adjacencies(volume, 3, 2, vol_faces);
+    in_faces = intersect(adj_faces, vol_faces);
+    this->mb->tag_get_data(this->centroid_tag, &volume, 1, &vol_centroid);
+
+    for (Range::iterator it = in_faces.begin(); it != in_faces.end(); ++it) {
+        this->mtu->get_bridge_adjacencies(*it, 2, 0, aux_nodes);
+        aux_nodes.erase(node);
+        this->mb->get_coords(aux_nodes, aux_nodes_coords);
+        std::copy(node_coords, node_coords + 3, aux_vector);
+        std::copy(aux_nodes_coords, aux_nodes_coords + 6, aux_vector + 9);
+        geoutils::normal_vector(aux_vector, vol_centroid, &spin);
+        // This is a workaround because std::swap can't be used with
+        // EntityHandle type.
+        index = spin ? 1 : 0;
+        count = this->get_lambda(node, aux_nodes[index % 2], *it);
+        clock = this->get_lambda(node, aux_nodes[(index + 1) % 2], *it);
+        counter_clockwise *= count;
+        clockwise *= clock;
+        aux_nodes.clear();
+    }
+    sigma = counter_clockwise + clockwise;
+
+    free(node_coords);
+    free(aux_nodes_coords);
+
+    return sigma;
 }
 
 double LPEW3::get_csi (EntityHandle face, EntityHandle volume) {
