@@ -39,7 +39,26 @@ double LPEW3::get_sigma (EntityHandle node, EntityHandle volume) {
 }
 
 double LPEW3::get_csi (EntityHandle face, EntityHandle volume) {
-    return 0.0;
+    Range face_nodes;
+    double *face_nodes_coords = (double*) calloc(9, sizeof(double));
+    double k[9], vol_centroid[3], n_i[3], sub_vol[12], csi = 0.0, tetra_vol = 0.0;
+
+    this->mb->tag_get_data(this->permeability_tag, &volume, 1, &k);
+    this->mb->tag_get_data(this->centroid_tag, &volume, 1, &vol_centroid);
+
+    this->mtu->get_bridge_adjacencies(face, 2, 3, face_nodes);
+    this->mb->get_coords(face_nodes, face_nodes_coords);
+    geoutils::normal_vector(face_nodes_coords, vol_centroid, n_i);
+
+    std::copy(face_nodes_coords, face_nodes_coords + 9, sub_vol);
+    std::copy(vol_centroid, vol_centroid + 3, sub_vol + 9);
+    tetra_vol = geoutils::tetra_volume(sub_vol);
+
+    csi = this->get_flux_term(n_i, k, n_i, 1.0);
+
+    free(face_nodes_coords);
+
+    return csi;
 }
 
 double LPEW3::get_neta (EntityHandle node, EntityHandle volume, EntityHandle face) {
