@@ -295,7 +295,7 @@ void MPFADSolver::node_treatment (EntityHandle node, int id_left, int id_right,
         b[id_left] += rhs*neu_term;
         this->weights[node].erase(node);
 
-        for (std::map<EntityHandle, double> it = this->weights[node].begin(); it != this->weights[node].end(); ++it) {
+        for (std::map<EntityHandle, double>::iterator it = this->weights[node].begin(); it != this->weights[node].end(); ++it) {
             this->mb->tag_get_data(this->tags[global_id], &(it->first), 1, &vol_id);
             col_value = it->second * rhs;
             A.InsertGlobalValues(id_right, 1, &col_value, &vol_id); col_value *= -1;
@@ -303,7 +303,7 @@ void MPFADSolver::node_treatment (EntityHandle node, int id_left, int id_right,
         }
     }
     else if (std::find(this->internal_nodes.begin(), this->internal_nodes.end(), node) != this->internal_nodes.end()) {
-        for (std::map<EntityHandle, double> it = this->weights[node].begin(); it != this->weights[node].end(); ++it) {
+        for (std::map<EntityHandle, double>::iterator it = this->weights[node].begin(); it != this->weights[node].end(); ++it) {
             this->mb->tag_get_data(this->tags[global_id], &(it->first), 1, &vol_id);
             col_value = it->second * rhs;
             A.InsertGlobalValues(id_right, 1, &col_value, &vol_id); col_value *= -1;
@@ -554,9 +554,9 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &id_left);
         this->mb->tag_get_data(this->tags[global_id], &right_volume, 1, &id_right);
 
-        this->node_treatment(face_vertices[0], id_left, id_right, k_eq, 0.0, d_JK, b);
-        this->node_treatment(face_vertices[1], id_left, id_right, k_eq, d_JI, -d_JK, b);
-        this->node_treatment(face_vertices[2], id_left, id_right, k_eq, -d_JI, 0.0, b);
+        this->node_treatment(face_vertices[0], id_left, id_right, k_eq, 0.0, d_JK, A, b);
+        this->node_treatment(face_vertices[1], id_left, id_right, k_eq, d_JI, -d_JK, A, b);
+        this->node_treatment(face_vertices[2], id_left, id_right, k_eq, -d_JI, 0.0, A, b);
 
         cols_ids[0] = id_right; cols_ids[1] = id_left;
         right_cols_values[0] = k_eq; right_cols_values[1] = -k_eq;
