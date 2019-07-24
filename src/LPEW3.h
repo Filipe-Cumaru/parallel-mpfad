@@ -25,9 +25,6 @@
 /* BLAS header */
 #include "cblas.h"
 
-/* MPI header */
-#include <mpi.h>
-
 #include "geoutils.h"
 
 using namespace std;
