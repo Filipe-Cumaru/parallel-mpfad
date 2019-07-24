@@ -119,7 +119,9 @@ double LPEW3::get_psi_sum (EntityHandle node, EntityHandle volume, EntityHandle 
         this->mtu-> get_bridge_adjacencies(faces[i], 2, 0, a_face_nodes);
         other_node = subtract(face_nodes, a_face_nodes);
         lambda1 = this->get_lambda(node, aux_node[0], faces[i]);
+        cout << "1st call to lambda OK" << endl;
         lambda2 = this->get_lambda(node, other_node[0], faces[j]);
+        cout << "2nd call to lambda OK" << endl;
         neta = this->get_neta(node, volume, faces[i]);
         psi_sum += lambda1*lambda2*neta;
     }
@@ -294,10 +296,15 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
     }
 
     free(face_nodes_coords);
+    cout << "Freeing face_nodes_coords is OK" << endl;
     free(ref_node_coords);
+    cout << "Freeing ref_node_coords is OK" << endl;
     free(aux_node_coords);
+    cout << "Freeing aux_node_coords is OK" << endl;
     free(node_coords);
+    cout << "Freeing node_coords is OK" << endl;
     free(ref_node_i_coords);
+    cout << "Freeing ref_node_i_coords is OK" << endl;
 
     return lambda_sum;
 }

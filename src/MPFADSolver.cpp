@@ -213,11 +213,14 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     this->internal_nodes = subtract(this->internal_nodes, this->dirichlet_nodes);
 
     LPEW3 interpolation_method (this->mb);
+    cout << "Initializing tags for LPEW3" << endl;
     interpolation_method.init_tags();
 
+    cout << "Interpolating internal nodes" << endl;
     for (Range::iterator it = this->internal_nodes.begin(); it != this->internal_nodes.end(); ++it) {
         interpolation_method.interpolate(*it, false, this->weights[*it]);
     }
+    cout << "Interpolating neumann nodes" << endl;
     for (Range::iterator it = this->neumann_nodes.begin(); it != this->neumann_nodes.end(); ++it) {
         interpolation_method.interpolate(*it, true, this->weights[*it]);
     }
