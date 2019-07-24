@@ -169,57 +169,57 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     ErrorCode rval;
 
     // Retrieving Dirichlet faces and nodes.
-    Range dirichlet_faces, dirichlet_nodes;
+    Range dirichlet_faces;
     rval = this->mb->get_entities_by_type_and_tag(0, MBTRI,
                     &this->tags[dirichlet], NULL, 1, dirichlet_faces);
     if (rval != MB_SUCCESS) {
         throw runtime_error("Unable to get dirichlet entities");
     }
     rval = this->mb->get_entities_by_type_and_tag(0, MBVERTEX,
-                    &this->tags[dirichlet], NULL, 1, dirichlet_nodes);
+                    &this->tags[dirichlet], NULL, 1, this->dirichlet_nodes);
     if (rval != MB_SUCCESS) {
         throw runtime_error("Unable to get dirichlet entities");
     }
 
     // Retrieving Neumann faces and nodes. Notice that faces/nodes
     // that are also Dirichlet faces/nodes are filtered.
-    Range neumann_faces, neumann_nodes;
+    Range neumann_faces;
     rval = this->mb->get_entities_by_type_and_tag(0, MBTRI,
                     &this->tags[neumann], NULL, 1, neumann_faces);
     if (rval != MB_SUCCESS) {
         throw runtime_error("Unable to get neumann entities");
     }
     rval = this->mb->get_entities_by_type_and_tag(0, MBVERTEX,
-                    &this->tags[neumann], NULL, 1, neumann_nodes);
+                    &this->tags[neumann], NULL, 1, this->neumann_nodes);
     if (rval != MB_SUCCESS) {
         throw runtime_error("Unable to get neumann entities");
     }
     neumann_faces = subtract(neumann_faces, dirichlet_faces);
-    neumann_nodes = subtract(neumann_nodes, dirichlet_nodes);
+    this->neumann_nodes = subtract(this->neumann_nodes, this->dirichlet_nodes);
 
     // Get internal faces and nodes.
-    Range internal_faces, internal_nodes;
+    Range internal_faces;
     rval = this->mb->get_entities_by_dimension(0, 2, internal_faces);
     if (rval != MB_SUCCESS) {
         throw runtime_error("Unable to get internal faces");
     }
     internal_faces = subtract(internal_faces, neumann_faces);
     internal_faces = subtract(internal_faces, dirichlet_faces);
-    rval = this->mb->get_entities_by_dimension(0, 0, internal_nodes);
+    rval = this->mb->get_entities_by_dimension(0, 0, this->internal_nodes);
     if (rval != MB_SUCCESS) {
         throw runtime_error("Unable to get internal nodes");
     }
-    internal_nodes = subtract(internal_nodes, neumann_nodes);
-    internal_nodes = subtract(internal_nodes, dirichlet_nodes);
+    this->internal_nodes = subtract(this->internal_nodes, this->neumann_nodes);
+    this->internal_nodes = subtract(this->internal_nodes, this->dirichlet_nodes);
 
     LPEW3 interpolation_method (this->mb);
     interpolation_method.init_tags();
 
-    for (Range::iterator it = internal_nodes.begin(); it != internal_nodes.end(); ++it) {
-        interpolation_method.interpolate(*it, false, this->weights);
+    for (Range::iterator it = this->internal_nodes.begin(); it != this->internal_nodes.end(); ++it) {
+        interpolation_method.interpolate(*it, false, this->weights[*it]);
     }
-    for (Range::iterator it = neumann_nodes.begin(); it != neumann_nodes.end(); ++it) {
-        interpolation_method.interpolate(*it, true, this->weights);
+    for (Range::iterator it = this->neumann_nodes.begin(); it != this->neumann_nodes.end(); ++it) {
+        interpolation_method.interpolate(*it, true, this->weights[*it]);
     }
 
     // Check source terms and assign their values straight to the
@@ -277,14 +277,39 @@ double MPFADSolver::get_cross_diffusion_term (double tan[3], double vec[3], doub
 }
 
 void MPFADSolver::node_treatment (EntityHandle node, int id_left, int id_right,
-                                    double k_eq, double d_JI, double d_JK, Epetra_Vector& b) {
-    // This is a temporary version of the node treatment that only works
-    // when all nodes are dirichlet nodes.
+                                    double k_eq, double d_JI, double d_JK,
+                                    Epetra_CrsMatrix& A, Epetra_Vector& b) {
     double rhs = 0.5 * k_eq * (d_JK + d_JI);
-    double pressure = 0.0;
-    this->mb->tag_get_data(this->tags[dirichlet], &node, 1, &pressure);
-    b[id_left] -= rhs*pressure;
-    b[id_right] += rhs*pressure;
+    double col_value;
+    int vol_id = -1;
+
+    if (std::find(this->dirichlet_nodes.begin(), this->dirichlet_nodes.end(), node) != this->dirichlet_nodes.end()) {
+        double pressure = 0.0;
+        this->mb->tag_get_data(this->tags[dirichlet], &node, 1, &pressure);
+        b[id_left] -= rhs*pressure;
+        b[id_right] += rhs*pressure;
+    }
+    else if (std::find(this->neumann_nodes.begin(), this->neumann_nodes.end(), node) != this->neumann_nodes.end()) {
+        double neu_term = this->weights[node][node];
+        b[id_right] -= rhs*neu_term;
+        b[id_left] += rhs*neu_term;
+        this->weights[node].erase(node);
+
+        for (std::map<EntityHandle, double> it = this->weights[node].begin(); it != this->weights[node].end(); ++it) {
+            this->mb->tag_get_data(this->tags[global_id], &(it->first), 1, &vol_id);
+            col_value = it->second * rhs;
+            A.InsertGlobalValues(id_right, 1, &col_value, &vol_id); col_value *= -1;
+            A.InsertGlobalValues(id_left, 1, &col_value, &vol_id);
+        }
+    }
+    else if (std::find(this->internal_nodes.begin(), this->internal_nodes.end(), node) != this->internal_nodes.end()) {
+        for (std::map<EntityHandle, double> it = this->weights[node].begin(); it != this->weights[node].end(); ++it) {
+            this->mb->tag_get_data(this->tags[global_id], &(it->first), 1, &vol_id);
+            col_value = it->second * rhs;
+            A.InsertGlobalValues(id_right, 1, &col_value, &vol_id); col_value *= -1;
+            A.InsertGlobalValues(id_left, 1, &col_value, &vol_id);
+        }
+    }
 }
 
 void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range neumann_faces) {
@@ -529,7 +554,6 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &id_left);
         this->mb->tag_get_data(this->tags[global_id], &right_volume, 1, &id_right);
 
-        // Node treatment goes here. It depends on the interpolation.
         this->node_treatment(face_vertices[0], id_left, id_right, k_eq, 0.0, d_JK, b);
         this->node_treatment(face_vertices[1], id_left, id_right, k_eq, d_JI, -d_JK, b);
         this->node_treatment(face_vertices[2], id_left, id_right, k_eq, -d_JI, 0.0, b);

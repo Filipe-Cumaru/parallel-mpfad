@@ -38,10 +38,6 @@
 #include "geoutils.h"
 #include "LPEW3.h"
 
-#define DIRICHLET_NODE 1;
-#define NEUMANN_NODE 2;
-#define INTERNAL_NODE 3;
-
 using namespace std;
 using namespace moab;
 
@@ -55,7 +51,10 @@ private:
     MeshTopoUtil *mtu;
     ParallelComm *pcomm;
     Tag tags[7];
-    std::map<EntityHandle, double> weights;
+    std::map<EntityHandle, std::map<EntityHandle, double>> weights;
+    Range dirichlet_nodes;
+    Range neumann_nodes;
+    Range internal_nodes;
 public:
     MPFADSolver ();
     MPFADSolver (Interface *moab_interface);
@@ -72,7 +71,8 @@ private:
                                     double h2, double Kn2, double Kt2,
                                     bool boundary);
     void node_treatment (EntityHandle node, int id_left, int id_right,
-                        double k_eq, double d_JI, double d_JK, Epetra_Vector& b);
+                        double k_eq, double d_JI, double d_JK, Epetra_CrsMatrix& A,
+                        Epetra_Vector& b);
     void visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range neumann_faces);
     void visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range dirichlet_faces);
     void visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Range internal_faces);
