@@ -36,6 +36,11 @@
 #include <mpi.h>
 
 #include "geoutils.h"
+#include "LPEW3.h"
+
+#define DIRICHLET_NODE 1;
+#define NEUMANN_NODE 2;
+#define INTERNAL_NODE 3;
 
 using namespace std;
 using namespace moab;
