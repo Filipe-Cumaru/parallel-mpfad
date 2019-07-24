@@ -22,7 +22,7 @@ void LPEW3::interpolate (EntityHandle node, bool is_neumann, std::map<EntityHand
     for (Range::iterator it = vols_around.begin(); it != vols_around.end(); ++it) {
         p_weight = this->get_partial_weight(node, *it);
         p_weight_sum += p_weight;
-        weights.insert(std::pair<EntityHandle, double>(*it, p_weight));
+        weights[*it] = p_weight;
     }
 
     for (Range::iterator it = vols_around.begin(); it != vols_around.end(); ++it) {
@@ -31,7 +31,7 @@ void LPEW3::interpolate (EntityHandle node, bool is_neumann, std::map<EntityHand
 
     if (is_neumann) {
         neu_term = this->neumann_treatment(node) / p_weight_sum;
-        weights.insert(std::pair<EntityHandle, double>(node, neu_term));
+        weights[node] = neu_term;
     }
 }
 
