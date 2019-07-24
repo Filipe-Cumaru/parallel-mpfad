@@ -212,7 +212,16 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     internal_nodes = subtract(internal_nodes, neumann_nodes);
     internal_nodes = subtract(internal_nodes, dirichlet_nodes);
 
-    // TODO: Node interpolation here.
+    LPEW3 interpolation_method (this->mb);
+    std::map<EntityHandle, double> weights;
+    interpolation_method.init_tags();
+
+    for (Range::iterator it = internal_nodes.begin(); it != internal_nodes.end(); ++it) {
+        interpolation_method.interpolate(*it, false, weights);
+    }
+    for (Range::iterator it = neumann_nodes.begin(); it != neumann_nodes.end(); ++it) {
+        interpolation_method.interpolate(*it, true, weights);
+    }
 
     // Check source terms and assign their values straight to the
     // right hand vector.

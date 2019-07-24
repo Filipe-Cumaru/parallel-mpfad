@@ -46,6 +46,7 @@ public:
     LPEW3 ();
     LPEW3 (Interface *moab_interface);
     void interpolate (EntityHandle node, bool is_neumann, std::map<EntityHandle, double>& weights);
+    void init_tags ();
 private:
     double neumann_treatment (EntityHandle node);
     double get_partial_weight (EntityHandle node, EntityHandle volume);
@@ -56,7 +57,6 @@ private:
     double get_neta (EntityHandle node, EntityHandle volume, EntityHandle face);
     double get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle face);
     double get_flux_term (double v1[3], double k[9], double v2[3], double face_area);
-    void init_tags ();
 };
 
 #endif
