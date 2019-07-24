@@ -50,6 +50,7 @@ private:
     MeshTopoUtil *mtu;
     ParallelComm *pcomm;
     Tag tags[7];
+    std::map<EntityHandle, double> weights;
 public:
     MPFADSolver ();
     MPFADSolver (Interface *moab_interface);
