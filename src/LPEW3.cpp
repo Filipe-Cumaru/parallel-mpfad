@@ -37,7 +37,7 @@ void LPEW3::interpolate (EntityHandle node, bool is_neumann, std::map<EntityHand
 
 double LPEW3::neumann_treatment (EntityHandle node) {
     Range adj_faces, neumann_faces, face_nodes, neu_vol;
-    double *face_nodes_coords = (double*) calloc(9, sizeof(double));
+    double face_nodes_coords[9];
     double neu_term_sum = 0.0, neu_term = 0.0, face_flux = 0.0, n[3], neu_psi,
         neu_phi, face_area;
 
@@ -49,7 +49,7 @@ double LPEW3::neumann_treatment (EntityHandle node) {
     for (Range::iterator it  = adj_faces.begin(); it != adj_faces.end(); ++it) {
         this->mb->tag_get_data(this->neumann_tag, &(*it), 1, &face_flux);
         this->mb->get_adjacencies(&(*it), 1, 0, false, face_nodes);
-        this->mb->get_coords(face_nodes, face_nodes_coords);
+        this->mb->get_coords(face_nodes, &face_nodes_coords[0]);
         geoutils::normal_vector(face_nodes_coords, n);
         face_area = geoutils::face_area(n);
         this->mtu->get_bridge_adjacencies(*it, 2, 3, neu_vol);
@@ -60,8 +60,6 @@ double LPEW3::neumann_treatment (EntityHandle node) {
         face_nodes.clear();
         neu_vol.clear();
     }
-
-    free(face_nodes_coords);
 
     return neu_term_sum;
 }
@@ -119,9 +117,7 @@ double LPEW3::get_psi_sum (EntityHandle node, EntityHandle volume, EntityHandle 
         this->mtu-> get_bridge_adjacencies(faces[i], 2, 0, a_face_nodes);
         other_node = subtract(face_nodes, a_face_nodes);
         lambda1 = this->get_lambda(node, aux_node[0], faces[i]);
-        cout << "1st call to lambda OK" << endl;
         lambda2 = this->get_lambda(node, other_node[0], faces[j]);
-        cout << "2nd call to lambda OK" << endl;
         neta = this->get_neta(node, volume, faces[i]);
         psi_sum += lambda1*lambda2*neta;
     }
@@ -156,8 +152,7 @@ double LPEW3::get_phi (EntityHandle node, EntityHandle volume, EntityHandle face
 
 double LPEW3::get_sigma (EntityHandle node, EntityHandle volume) {
     Range vol_faces, adj_faces, in_faces, aux_nodes;
-    double *node_coords = (double*) calloc(3, sizeof(double));
-    double *aux_nodes_coords = (double*) calloc(6, sizeof(double));
+    double node_coords[3], aux_nodes_coords[6];
     double sigma = 0.0, vol_centroid[3], clockwise = 1.0, counter_clockwise = 1.0,
         aux_vector[9], count = 0.0, clock = 0.0;
     bool spin = false;
@@ -171,7 +166,7 @@ double LPEW3::get_sigma (EntityHandle node, EntityHandle volume) {
     for (Range::iterator it = in_faces.begin(); it != in_faces.end(); ++it) {
         this->mtu->get_bridge_adjacencies(*it, 2, 0, aux_nodes);
         aux_nodes.erase(node);
-        this->mb->get_coords(aux_nodes, aux_nodes_coords);
+        this->mb->get_coords(aux_nodes, &aux_nodes_coords[0]);
         std::copy(node_coords, node_coords + 3, aux_vector);
         std::copy(aux_nodes_coords, aux_nodes_coords + 6, aux_vector + 9);
         geoutils::normal_vector(aux_vector, vol_centroid, &spin);
@@ -186,22 +181,19 @@ double LPEW3::get_sigma (EntityHandle node, EntityHandle volume) {
     }
     sigma = counter_clockwise + clockwise;
 
-    free(node_coords);
-    free(aux_nodes_coords);
-
     return sigma;
 }
 
 double LPEW3::get_csi (EntityHandle face, EntityHandle volume) {
     Range face_nodes;
-    double *face_nodes_coords = (double*) calloc(9, sizeof(double));
+    double face_nodes_coords[9];
     double k[9], vol_centroid[3], n_i[3], sub_vol[12], csi = 0.0, tetra_vol = 0.0;
 
     this->mb->tag_get_data(this->permeability_tag, &volume, 1, &k);
     this->mb->tag_get_data(this->centroid_tag, &volume, 1, &vol_centroid);
 
     this->mtu->get_bridge_adjacencies(face, 2, 3, face_nodes);
-    this->mb->get_coords(face_nodes, face_nodes_coords);
+    this->mb->get_coords(face_nodes, &face_nodes_coords[0]);
     geoutils::normal_vector(face_nodes_coords, vol_centroid, n_i);
 
     std::copy(face_nodes_coords, face_nodes_coords + 9, sub_vol);
@@ -210,31 +202,29 @@ double LPEW3::get_csi (EntityHandle face, EntityHandle volume) {
 
     csi = this->get_flux_term(n_i, k, n_i, 1.0);
 
-    free(face_nodes_coords);
-
     return csi;
 }
 
 double LPEW3::get_neta (EntityHandle node, EntityHandle volume, EntityHandle face) {
     Range vol_nodes, face_nodes, ref_node;
-    double *vol_nodes_coords = (double*) calloc(12, sizeof(double));
-    double *face_nodes_coords = (double*) calloc(9, sizeof(double));
-    double *face_nodes_i_coords = (double*) calloc(9, sizeof(double));
-    double *node_coords = (double*) calloc(9, sizeof(double));
-    double *ref_node_coords = (double*) calloc(3, sizeof(double));
+    double vol_nodes_coords[12];
+    double face_nodes_coords[9];
+    double face_nodes_i_coords[9];
+    double node_coords[9];
+    double ref_node_coords[3];
     double k[9], n_out[3], n_i[3], tetra_vol = 0.0, neta = 0.0;
 
     this->mb->get_adjacencies(&volume, 1, 0, false, vol_nodes);
     this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
     ref_node = subtract(vol_nodes, face_nodes);
 
-    this->mb->get_coords(vol_nodes, vol_nodes_coords);
-    this->mb->get_coords(face_nodes, face_nodes_coords);
-    this->mb->get_coords(ref_node, ref_node_coords);
-    this->mb->get_coords(&node, 1, node_coords);
+    this->mb->get_coords(vol_nodes, &vol_nodes_coords[0]);
+    this->mb->get_coords(face_nodes, &face_nodes_coords[0]);
+    this->mb->get_coords(ref_node, &ref_node_coords[0]);
+    this->mb->get_coords(&node, 1, &node_coords[0]);
 
     vol_nodes.erase(node);
-    this->mb->get_coords(vol_nodes, face_nodes_i_coords);
+    this->mb->get_coords(vol_nodes, &face_nodes_i_coords[0]);
 
     geoutils::normal_vector(face_nodes_i_coords, node_coords, n_out);
     geoutils::normal_vector(face_nodes_coords, ref_node_coords, n_i);
@@ -243,22 +233,13 @@ double LPEW3::get_neta (EntityHandle node, EntityHandle volume, EntityHandle fac
     this->mb->tag_get_data(this->permeability_tag, &volume, 1, &k);
     neta = this->get_flux_term(n_out, k, n_i, 1.0) / tetra_vol;
 
-    free(vol_nodes_coords);
-    free(face_nodes_coords);
-    free(face_nodes_i_coords);
-    free(node_coords);
-    free(ref_node_coords);
-
     return neta;
 }
 
 double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle face) {
     Range adj_vols, face_nodes, ref_node, vol_nodes, ref_node_i;
-    double *face_nodes_coords = (double*) calloc(9, sizeof(double));
-    double *ref_node_coords = (double*) calloc(3, sizeof(double));
-    double *aux_node_coords = (double*) calloc(3, sizeof(double));
-    double *node_coords = (double*) calloc(3, sizeof(double));
-    double *ref_node_i_coords = (double*) calloc(3, sizeof(double));
+    double face_nodes_coords[9], ref_node_coords[3], aux_node_coords[3],
+        node_coords[3], ref_node_i_coords[3];
     double lambda_sum = 0.0, tetra_vol = 0.0, k[9], vol_centroid[3], sub_vol[12],
         n_int[3], n_i[3];
 
@@ -269,10 +250,10 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
     face_nodes.erase(node);
     face_nodes.erase(aux_node);
 
-    this->mb->get_coords(face_nodes, face_nodes_coords);
-    this->mb->get_coords(ref_node, ref_node_coords);
-    this->mb->get_coords(&aux_node, 1, aux_node_coords);
-    this->mb->get_coords(&node, 1, node_coords);
+    this->mb->get_coords(face_nodes, &face_nodes_coords[0]);
+    this->mb->get_coords(ref_node, &ref_node_coords[0]);
+    this->mb->get_coords(&aux_node, 1, &aux_node_coords[0]);
+    this->mb->get_coords(&node, 1, &node_coords[0]);
 
     for (Range::iterator it = adj_vols.begin(); it != adj_vols.end(); ++it) {
         this->mb->tag_get_data(this->permeability_tag, &(*it), 1, &k);
@@ -284,7 +265,7 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
         tetra_vol = geoutils::tetra_volume(sub_vol);
 
         ref_node_i = subtract(vol_nodes, face_nodes);
-        this->mb->get_coords(ref_node_i, ref_node_i_coords);
+        this->mb->get_coords(ref_node_i, &ref_node_i_coords[0]);
 
         geoutils::normal_vector(node_coords, aux_node_coords, vol_centroid, ref_node_coords, n_int);
         geoutils::normal_vector(face_nodes_coords, ref_node_i_coords, n_i);
@@ -294,17 +275,6 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
         vol_nodes.clear();
         ref_node_i.clear();
     }
-
-    free(face_nodes_coords);
-    cout << "Freeing face_nodes_coords is OK" << endl;
-    free(ref_node_coords);
-    cout << "Freeing ref_node_coords is OK" << endl;
-    free(aux_node_coords);
-    cout << "Freeing aux_node_coords is OK" << endl;
-    free(node_coords);
-    cout << "Freeing node_coords is OK" << endl;
-    free(ref_node_i_coords);
-    cout << "Freeing ref_node_i_coords is OK" << endl;
 
     return lambda_sum;
 }
