@@ -23,6 +23,7 @@ void LPEW3::interpolate (EntityHandle node, bool is_neumann, std::map<EntityHand
         p_weight = this->get_partial_weight(node, *it);
         p_weight_sum += p_weight;
         weights[*it] = p_weight;
+        printf("partial weight = %lf\n", p_weight);
     }
 
     for (Range::iterator it = vols_around.begin(); it != vols_around.end(); ++it) {
@@ -48,7 +49,7 @@ double LPEW3::neumann_treatment (EntityHandle node) {
 
     for (Range::iterator it  = adj_faces.begin(); it != adj_faces.end(); ++it) {
         this->mb->tag_get_data(this->neumann_tag, &(*it), 1, &face_flux);
-        this->mb->get_adjacencies(&(*it), 1, 0, false, face_nodes);
+        this->mtu->get_bridge_adjacencies(*it, 2, 0, face_nodes);
         this->mb->get_coords(face_nodes, &face_nodes_coords[0]);
         geoutils::normal_vector(face_nodes_coords, n);
         face_area = geoutils::face_area(n);
@@ -104,7 +105,7 @@ double LPEW3::get_psi_sum (EntityHandle node, EntityHandle volume, EntityHandle 
     double psi_sum = 0.0, lambda1 = 0.0, lambda2 = 0.0, neta = 0.0, sigma = 0.0;
 
     this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
-    this->mb->get_adjacencies(&volume, 1, 0, false, vol_nodes);
+    this->mtu->get_bridge_adjacencies(volume, 3, 0, vol_nodes);
     aux_node = subtract(vol_nodes, face_nodes);
 
     this->mtu->get_bridge_adjacencies(node, 0, 2, adj_faces);
@@ -113,13 +114,14 @@ double LPEW3::get_psi_sum (EntityHandle node, EntityHandle volume, EntityHandle 
     faces.erase(face);
 
     int num_faces = faces.size(), j = num_faces - 1;
-    for (int i = 0; i < num_faces; i++, (++j) % num_faces) {
-        this->mtu-> get_bridge_adjacencies(faces[i], 2, 0, a_face_nodes);
+    for (int i = 0; i < num_faces; i++) {
+        this->mtu->get_bridge_adjacencies(faces[i], 2, 0, a_face_nodes);
         other_node = subtract(face_nodes, a_face_nodes);
         lambda1 = this->get_lambda(node, aux_node[0], faces[i]);
         lambda2 = this->get_lambda(node, other_node[0], faces[j]);
         neta = this->get_neta(node, volume, faces[i]);
         psi_sum += lambda1*lambda2*neta;
+        j = (j + 1) % num_faces;
     }
     sigma = this->get_sigma(node, volume);
     psi_sum /= sigma;
@@ -132,7 +134,7 @@ double LPEW3::get_phi (EntityHandle node, EntityHandle volume, EntityHandle face
     double phi = 0.0, lambda_mult = 1.0, sigma = 1.0, neta = 0.0;
 
     this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
-    this->mb->get_adjacencies(&volume, 1, 0, false, vol_nodes);
+    this->mtu->get_bridge_adjacencies(volume, 3, 0, vol_nodes);
     aux_node = subtract(vol_nodes, face_nodes);
     this->mtu->get_bridge_adjacencies(node, 0, 2, adj_faces);
     this->mtu->get_bridge_adjacencies(volume, 3, 2, vol_faces);
@@ -214,7 +216,7 @@ double LPEW3::get_neta (EntityHandle node, EntityHandle volume, EntityHandle fac
     double ref_node_coords[3];
     double k[9], n_out[3], n_i[3], tetra_vol = 0.0, neta = 0.0;
 
-    this->mb->get_adjacencies(&volume, 1, 0, false, vol_nodes);
+    this->mtu->get_bridge_adjacencies(volume, 3, 0, vol_nodes);
     this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
     ref_node = subtract(vol_nodes, face_nodes);
 
@@ -258,7 +260,7 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
     for (Range::iterator it = adj_vols.begin(); it != adj_vols.end(); ++it) {
         this->mb->tag_get_data(this->permeability_tag, &(*it), 1, &k);
         this->mb->tag_get_data(this->centroid_tag, &(*it), 1, &vol_centroid);
-        this->mb->get_adjacencies(&(*it), 1, 0, false, vol_nodes);
+        this->mtu->get_bridge_adjacencies(*it, 3, 0, vol_nodes);
 
         std::copy(face_nodes_coords, face_nodes_coords + 9, sub_vol);
         std::copy(vol_centroid, vol_centroid + 3, sub_vol + 9);
