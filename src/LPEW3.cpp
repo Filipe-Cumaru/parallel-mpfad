@@ -168,7 +168,7 @@ double LPEW3::get_sigma (EntityHandle node, EntityHandle volume) {
         aux_nodes.erase(node);
         this->mb->get_coords(aux_nodes, &aux_nodes_coords[0]);
         std::copy(node_coords, node_coords + 3, aux_vector);
-        std::copy(aux_nodes_coords, aux_nodes_coords + 6, aux_vector + 9);
+        std::copy(aux_nodes_coords, aux_nodes_coords + 6, aux_vector + 3);
         geoutils::normal_vector(aux_vector, vol_centroid, &spin);
         // This is a workaround because std::swap can't be used with
         // EntityHandle type.
