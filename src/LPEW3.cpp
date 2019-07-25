@@ -201,7 +201,7 @@ double LPEW3::get_csi (EntityHandle face, EntityHandle volume) {
     std::copy(vol_centroid, vol_centroid + 3, sub_vol + 9);
     tetra_vol = geoutils::tetra_volume(sub_vol);
 
-    csi = this->get_flux_term(n_i, k, n_i, 1.0);
+    csi = this->get_flux_term(n_i, k, n_i, 1.0) / tetra_vol;
 
     return csi;
 }
