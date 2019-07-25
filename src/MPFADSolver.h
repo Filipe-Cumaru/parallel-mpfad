@@ -51,7 +51,7 @@ private:
     MeshTopoUtil *mtu;
     ParallelComm *pcomm;
     Tag tags[7];
-    std::map<EntityHandle, std::map<EntityHandle, double>> weights;
+    std::map<EntityHandle, std::map<EntityHandle, double> > weights;
     Range dirichlet_nodes;
     Range neumann_nodes;
     Range internal_nodes;
