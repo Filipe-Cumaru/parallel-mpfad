@@ -249,8 +249,9 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
     this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
 
     // face_nodes = face_nodes - (node U aux_node)
-    face_nodes.erase(node);
-    face_nodes.erase(aux_node);
+    ref_node = face_nodes;
+    ref_node.erase(node);
+    ref_node.erase(aux_node);
 
     this->mb->get_coords(face_nodes, &face_nodes_coords[0]);
     this->mb->get_coords(ref_node, &ref_node_coords[0]);
