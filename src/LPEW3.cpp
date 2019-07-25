@@ -196,6 +196,7 @@ double LPEW3::get_csi (EntityHandle face, EntityHandle volume) {
     this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
     this->mb->get_coords(face_nodes, face_nodes_coords);
     geoutils::normal_vector(face_nodes_coords, vol_centroid, n_i);
+    cblas_dscal(3, 0.5, &n_i[0], 1);
 
     std::copy(face_nodes_coords, face_nodes_coords + 9, sub_vol);
     std::copy(vol_centroid, vol_centroid + 3, sub_vol + 9);
@@ -282,7 +283,7 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
 }
 
 double LPEW3::get_flux_term (double v1[3], double k[9], double v2[3], double face_area) {
-    double flux_term = 0.0, temp[3];
+    double flux_term = 0.0, temp[3] = {0.0, 0.0, 0.0};
     // <<v1, K>, v2> = trans(trans(v1)*K)*v2
     cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &v1[0], 1, &k[0], 3, 1.0, &temp[0], 3);
     flux_term = cblas_ddot(3, &temp[0], 1, &v2[0], 1) / face_area;
