@@ -108,7 +108,7 @@ double LPEW3::get_psi_sum (EntityHandle node, EntityHandle volume, EntityHandle 
     aux_node = subtract(vol_nodes, face_nodes);
 
     this->mtu->get_bridge_adjacencies(node, 0, 2, adj_faces);
-    this->mtu->get_bridge_adjacencies(node, 3, 2, vol_faces);
+    this->mtu->get_bridge_adjacencies(volume, 3, 2, vol_faces);
     faces = intersect(adj_faces, vol_faces);
     faces.erase(face);
 
