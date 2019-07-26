@@ -51,7 +51,7 @@ double LPEW3::neumann_treatment (EntityHandle node) {
         this->mtu->get_bridge_adjacencies(*it, 2, 0, face_nodes);
         this->mb->get_coords(face_nodes, &face_nodes_coords[0]);
         geoutils::normal_vector(face_nodes_coords, n);
-        face_area = 0.5*geoutils::face_area(n);
+        face_area = geoutils::face_area(n);
         this->mtu->get_bridge_adjacencies(*it, 2, 3, neu_vol);
         neu_psi = this->get_psi_sum(node, neu_vol[0], *it);
         neu_phi = this->get_phi(node, neu_vol[0], *it);
