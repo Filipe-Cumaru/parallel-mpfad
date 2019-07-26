@@ -294,8 +294,8 @@ void MPFADSolver::node_treatment (EntityHandle node, int id_left, int id_right,
     }
     else if (std::find(this->neumann_nodes.begin(), this->neumann_nodes.end(), node) != this->neumann_nodes.end()) {
         double neu_term = this->weights[node][node];
-        b[id_right] -= rhs*neu_term;
-        b[id_left] += rhs*neu_term;
+        b[id_left] -= rhs*neu_term;
+        b[id_right] += rhs*neu_term;
 
         for (std::map<EntityHandle, double>::iterator it = this->weights[node].begin(); it != this->weights[node].end(); ++it) {
             if (it->first == node) {
@@ -329,12 +329,13 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
     for (Range::iterator it = neumann_faces.begin(); it != neumann_faces.end(); ++it, ++i) {
         this->mtu->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
         this->mb->tag_get_data(this->tags[global_id], &(*vols_sharing_face.begin()), 1, &vol_id);
-        this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
+        this->mtu->get_bridge_adjacencies(*it, 2, 0, face_vertices);
         this->mb->get_coords(face_vertices, vert_coords);
         geoutils::normal_vector(vert_coords, n_IJK);
         face_area = geoutils::face_area(n_IJK);
         b[vol_id] -= faces_flow[i]*face_area;
         vols_sharing_face.clear();
+        face_vertices.clear();
     }
 
     free(vert_coords);
