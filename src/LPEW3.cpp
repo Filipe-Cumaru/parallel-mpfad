@@ -121,6 +121,7 @@ double LPEW3::get_psi_sum (EntityHandle node, EntityHandle volume, EntityHandle 
         neta = this->get_neta(node, volume, faces[i]);
         psi_sum += lambda1*lambda2*neta;
         j = (j + 1) % num_faces;
+        a_face_nodes.clear();
     }
     sigma = this->get_sigma(node, volume);
     psi_sum /= sigma;
