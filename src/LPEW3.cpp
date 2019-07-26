@@ -174,7 +174,7 @@ double LPEW3::get_sigma (EntityHandle node, EntityHandle volume) {
         // This is a workaround because std::swap can't be used with
         // EntityHandle type.
         index = spin ? 1 : 0;
-        count = this->get_lambda(node, aux_nodes[index % 2], *it);
+        count = this->get_lambda(node, aux_nodes[index], *it);
         clock = this->get_lambda(node, aux_nodes[(index + 1) % 2], *it);
         counter_clockwise *= count;
         clockwise *= clock;
@@ -196,7 +196,6 @@ double LPEW3::get_csi (EntityHandle face, EntityHandle volume) {
     this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
     this->mb->get_coords(face_nodes, face_nodes_coords);
     geoutils::normal_vector(face_nodes_coords, vol_centroid, n_i);
-    cblas_dscal(3, 0.5, &n_i[0], 1);
 
     std::copy(face_nodes_coords, face_nodes_coords + 9, sub_vol);
     std::copy(vol_centroid, vol_centroid + 3, sub_vol + 9);

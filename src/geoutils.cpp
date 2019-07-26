@@ -29,6 +29,7 @@ namespace geoutils {
         cblas_daxpy(3, 1, &vert_coords[6], 1, &ac[0], 1);
 
         geoutils::cross_product(ab, ac, n);
+        cblas_dscal(3, 0.5, &n[0], 1);
     }
 
     /*
@@ -52,6 +53,7 @@ namespace geoutils {
         cblas_daxpy(3, 1, &vert_coords[6], 1, &ac[0], 1);
 
         geoutils::cross_product(ab, ac, n);
+        cblas_dscal(3, 0.5, &n[0], 1);
 
         double vector_orientation = cblas_ddot(3, &n[0], 1, &ref_vector[0], 1);
         if (vector_orientation < 0.0) {
@@ -75,6 +77,7 @@ namespace geoutils {
         cblas_daxpy(3, 1, &vert_coords[6], 1, &ac[0], 1);
 
         geoutils::cross_product(ab, ac, n);
+        cblas_dscal(3, 0.5, &n[0], 1);
 
         double vector_orientation = cblas_ddot(3, &n[0], 1, &ref_vector[0], 1);
         if (vector_orientation < 0.0) {
@@ -101,6 +104,7 @@ namespace geoutils {
         cblas_daxpy(3, 1, &k[0], 1, &ac[0], 1);
 
         geoutils::cross_product(ab, ac, n);
+        cblas_dscal(3, 0.5, &n[0], 1);
 
         double vector_orientation = cblas_ddot(3, &n[0], 1, &ref_vector[0], 1);
         if (vector_orientation < 0.0) {

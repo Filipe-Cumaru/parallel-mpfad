@@ -330,7 +330,6 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
         this->mb->get_adjacencies(&(*it), 1, 0, false, face_vertices);
         this->mb->get_coords(face_vertices, vert_coords);
         geoutils::normal_vector(vert_coords, n_IJK);
-        cblas_dscal(3, 0.5, &n_IJK[0], 1);
         face_area = geoutils::face_area(n_IJK);
         b[vol_id] -= faces_flow[i]*face_area;
         vols_sharing_face.clear();
@@ -370,7 +369,6 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         this->mb->tag_get_data(this->tags[centroid], &left_volume, 1, &l);
 
         geoutils::normal_vector(vert_coords, n_IJK);
-        cblas_dscal(3, 0.5, &n_IJK[0], 1);
         face_area = geoutils::face_area(n_IJK);
 
         cblas_dcopy(3, &j[0], 1, &lj[0], 1);    // LJ = J
@@ -473,7 +471,6 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
 
         // Calculating normal term.
         geoutils::normal_vector(vert_coords, n_IJK);
-        cblas_dscal(3, 0.5, &n_IJK[0], 1);
         face_area = geoutils::face_area(n_IJK);
 
         double _test = cblas_ddot(3, &dist_LR[0], 1, &n_IJK[0], 1);
