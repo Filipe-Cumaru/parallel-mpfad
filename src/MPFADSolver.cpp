@@ -296,9 +296,11 @@ void MPFADSolver::node_treatment (EntityHandle node, int id_left, int id_right,
         double neu_term = this->weights[node][node];
         b[id_right] -= rhs*neu_term;
         b[id_left] += rhs*neu_term;
-        this->weights[node].erase(node);
 
         for (std::map<EntityHandle, double>::iterator it = this->weights[node].begin(); it != this->weights[node].end(); ++it) {
+            if (it->first == node) {
+                continue;
+            }
             this->mb->tag_get_data(this->tags[global_id], &(it->first), 1, &vol_id);
             col_value = it->second * rhs;
             A.InsertGlobalValues(id_right, 1, &col_value, &vol_id); col_value *= -1;
