@@ -163,6 +163,7 @@ double LPEW3::get_sigma (EntityHandle node, EntityHandle volume) {
     this->mtu->get_bridge_adjacencies(volume, 3, 2, vol_faces);
     in_faces = intersect(adj_faces, vol_faces);
     this->mb->tag_get_data(this->centroid_tag, &volume, 1, &vol_centroid);
+    this->mb->get_coords(&node, 1, &node_coords[0]);
 
     for (Range::iterator it = in_faces.begin(); it != in_faces.end(); ++it) {
         this->mtu->get_bridge_adjacencies(*it, 2, 0, aux_nodes);
