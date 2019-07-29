@@ -63,7 +63,7 @@ public:
     void write_file (string fname);
 private:
     void setup_tags (Tag tag_handles[5]);
-    void assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range volumes);
+    void assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range volumes, Range faces, Range nodes);
     void set_pressure_tags (Epetra_Vector& X, Range& volumes);
     void init_tags ();
     double get_cross_diffusion_term (double tan[3], double vec[3], double s,

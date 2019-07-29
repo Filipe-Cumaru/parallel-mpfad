@@ -27,8 +27,16 @@ void MPFADSolver::run () {
 
     // Get all volumes in the mesh and exchange those shared with
     // others processors.
-    Range volumes;
+    Range volumes, faces, nodes;
     rval = this->mb->get_entities_by_dimension(0, 3, volumes, false);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("Could not retrieve volumes from the mesh.\n");
+    }
+    rval = this->mb->get_entities_by_dimension(0, 2, faces, false);
+    if (rval != MB_SUCCESS) {
+        throw runtime_error("Could not retrieve volumes from the mesh.\n");
+    }
+    rval = this->mb->get_entities_by_dimension(0, 0, nodes, false);
     if (rval != MB_SUCCESS) {
         throw runtime_error("Could not retrieve volumes from the mesh.\n");
     }
@@ -73,7 +81,7 @@ void MPFADSolver::run () {
 
     printf("<%d> Matrix assembly...\n", rank);
     ts = clock();
-    this->assemble_matrix(A, b, volumes);
+    this->assemble_matrix(A, b, volumes, faces, nodes);
     ts = clock() - ts;
     printf("<%d> Done. Time elapsed: %f\n", rank, ((double) ts)/CLOCKS_PER_SEC);
     A.FillComplete();
@@ -165,7 +173,7 @@ void MPFADSolver::init_tags () {
     }
 }
 
-void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range volumes) {
+void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range volumes, Range faces, Range nodes) {
     ErrorCode rval;
 
     // Retrieving Dirichlet faces and nodes.
@@ -180,6 +188,8 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     if (rval != MB_SUCCESS) {
         throw runtime_error("Unable to get dirichlet entities");
     }
+    dirichlet_faces = intersect(dirichlet_faces, faces);
+    this->dirichlet_nodes = intersect(this->dirichlet_nodes, nodes);
 
     // Retrieving Neumann faces and nodes. Notice that faces/nodes
     // that are also Dirichlet faces/nodes are filtered.
@@ -196,6 +206,8 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     }
     neumann_faces = subtract(neumann_faces, dirichlet_faces);
     this->neumann_nodes = subtract(this->neumann_nodes, this->dirichlet_nodes);
+    neumann_faces = intersect(neumann_faces, faces);
+    this->neumann_nodes = intersect(this->neumann_nodes, nodes);
 
     // Get internal faces and nodes.
     Range internal_faces;
@@ -211,6 +223,8 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     }
     this->internal_nodes = subtract(this->internal_nodes, this->neumann_nodes);
     this->internal_nodes = subtract(this->internal_nodes, this->dirichlet_nodes);
+    internal_faces = intersect(internal_faces, faces);
+    this->internal_nodes = intersect(this->internal_nodes, nodes);
 
     LPEW3 interpolation_method (this->mb);
     cout << "Initializing tags for LPEW3" << endl;
@@ -291,11 +305,19 @@ void MPFADSolver::node_treatment (EntityHandle node, int id_left, int id_right,
         this->mb->tag_get_data(this->tags[dirichlet], &node, 1, &pressure);
         b[id_left] -= rhs*pressure;
         b[id_right] += rhs*pressure;
+        // if (rhs*pressure != 0.0) {
+        //     printf("b[%d] -= %lf\n", id_left, rhs*pressure);
+        //     printf("b[%d] += %lf\n", id_right, rhs*pressure);
+        // }
     }
     else if (std::find(this->neumann_nodes.begin(), this->neumann_nodes.end(), node) != this->neumann_nodes.end()) {
         double neu_term = this->weights[node][node];
         b[id_left] += rhs*neu_term;
         b[id_right] -= rhs*neu_term;
+        // if (rhs*neu_term != 0.0) {
+        //     printf("b[%d] += %lf\n", id_left, rhs*neu_term);
+        //     printf("b[%d] -= %lf\n", id_right, rhs*neu_term);
+        // }
 
         for (std::map<EntityHandle, double>::iterator it = this->weights[node].begin(); it != this->weights[node].end(); ++it) {
             if (it->first == node) {
@@ -334,6 +356,10 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
         geoutils::normal_vector(vert_coords, n_IJK);
         face_area = geoutils::face_area(n_IJK);
         b[vol_id] -= faces_flow[i]*face_area;
+        // double rhs = -faces_flow[i]*face_area;
+        // b.SumIntoGlobalValues(1, &rhs, &vol_id);
+        // if (faces_flow[i]*face_area != 0.0)
+        //     printf("b[%d] -= %lf\n", vol_id, faces_flow[i]*face_area);
         vols_sharing_face.clear();
         face_vertices.clear();
     }
@@ -432,6 +458,8 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 
         this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &vol_id);
         b[vol_id] -= rhs;
+        // if (rhs != 0.0)
+        //     printf("b[%d] -= %lf\n", vol_id, rhs);
         A.InsertGlobalValues(vol_id, 1, &k_eq, &vol_id);
 
         face_vertices.clear();
