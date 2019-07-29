@@ -294,8 +294,8 @@ void MPFADSolver::node_treatment (EntityHandle node, int id_left, int id_right,
     }
     else if (std::find(this->neumann_nodes.begin(), this->neumann_nodes.end(), node) != this->neumann_nodes.end()) {
         double neu_term = this->weights[node][node];
-        b[id_left] -= rhs*neu_term;
-        b[id_right] += rhs*neu_term;
+        b[id_left] += rhs*neu_term;
+        b[id_right] -= rhs*neu_term;
 
         for (std::map<EntityHandle, double>::iterator it = this->weights[node].begin(); it != this->weights[node].end(); ++it) {
             if (it->first == node) {
