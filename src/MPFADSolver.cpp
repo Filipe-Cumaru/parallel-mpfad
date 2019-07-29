@@ -113,10 +113,6 @@ void MPFADSolver::run () {
     ts = clock() - ts;
     printf("<%d> Done. Time elapsed: %f\n", rank, ((double) ts)/CLOCKS_PER_SEC);
 
-    A.Print(cout);
-    cout << b << endl;
-    cout << X << endl;
-
     free(gids);
 }
 
