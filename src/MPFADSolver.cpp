@@ -252,7 +252,7 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     for (Range::iterator it = source_volumes.begin(); it != source_volumes.end(); ++it) {
         this->mb->tag_get_data(this->tags[source], &(*it), 1, &source_term);
         this->mb->tag_get_data(this->tags[global_id], &(*it), 1, &volume_id);
-        b[volume_id] += source_term;
+        b.SumIntoGlobalValues(1, &source_term, &volume_id);
     }
 
     this->visit_neumann_faces(A, b, neumann_faces);
@@ -301,23 +301,19 @@ void MPFADSolver::node_treatment (EntityHandle node, int id_left, int id_right,
     int vol_id = -1;
 
     if (std::find(this->dirichlet_nodes.begin(), this->dirichlet_nodes.end(), node) != this->dirichlet_nodes.end()) {
-        double pressure = 0.0;
+        double pressure = 0.0, dirichlet_term;
         this->mb->tag_get_data(this->tags[dirichlet], &node, 1, &pressure);
-        b[id_left] -= rhs*pressure;
-        b[id_right] += rhs*pressure;
-        // if (rhs*pressure != 0.0) {
-        //     printf("b[%d] -= %lf\n", id_left, rhs*pressure);
-        //     printf("b[%d] += %lf\n", id_right, rhs*pressure);
-        // }
+        dirichlet_term = rhs*pressure;
+        b.SumIntoGlobalValues(1, &dirichlet_term, &id_right);
+        dirichlet_term = -rhs*pressure;
+        b.SumIntoGlobalValues(1, &dirichlet_term, &id_left);
     }
     else if (std::find(this->neumann_nodes.begin(), this->neumann_nodes.end(), node) != this->neumann_nodes.end()) {
-        double neu_term = this->weights[node][node];
-        b[id_left] += rhs*neu_term;
-        b[id_right] -= rhs*neu_term;
-        // if (rhs*neu_term != 0.0) {
-        //     printf("b[%d] += %lf\n", id_left, rhs*neu_term);
-        //     printf("b[%d] -= %lf\n", id_right, rhs*neu_term);
-        // }
+        double neu_term = this->weights[node][node], neumann_term;
+        neumann_term = rhs*neu_term;
+        b.SumIntoGlobalValues(1, &neumann_term, &id_left);
+        neumann_term = -rhs*neu_term;
+        b.SumIntoGlobalValues(1, &neumann_term, &id_right);
 
         for (std::map<EntityHandle, double>::iterator it = this->weights[node].begin(); it != this->weights[node].end(); ++it) {
             if (it->first == node) {
@@ -355,11 +351,8 @@ void MPFADSolver::visit_neumann_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, Ra
         this->mb->get_coords(face_vertices, vert_coords);
         geoutils::normal_vector(vert_coords, n_IJK);
         face_area = geoutils::face_area(n_IJK);
-        b[vol_id] -= faces_flow[i]*face_area;
-        // double rhs = -faces_flow[i]*face_area;
-        // b.SumIntoGlobalValues(1, &rhs, &vol_id);
-        // if (faces_flow[i]*face_area != 0.0)
-        //     printf("b[%d] -= %lf\n", vol_id, faces_flow[i]*face_area);
+        double rhs = -faces_flow[i]*face_area;
+        b.SumIntoGlobalValues(1, &rhs, &vol_id);
         vols_sharing_face.clear();
         face_vertices.clear();
     }
@@ -455,11 +448,10 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
 
         k_eq = (face_area*k_n_L) / h_L;
         rhs = d_JK*(node_pressure[0] - node_pressure[1]) - k_eq*node_pressure[1] + d_JI*(node_pressure[1] - node_pressure[2]);
+        rhs *= -1.0;
 
         this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &vol_id);
-        b[vol_id] -= rhs;
-        // if (rhs != 0.0)
-        //     printf("b[%d] -= %lf\n", vol_id, rhs);
+        b.SumIntoGlobalValues(1, &rhs, &vol_id);
         A.InsertGlobalValues(vol_id, 1, &k_eq, &vol_id);
 
         face_vertices.clear();
