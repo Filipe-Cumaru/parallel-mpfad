@@ -102,7 +102,7 @@ void MPFADSolver::run () {
     // ML_Epetra::SetDefaults("SA", MLList);
     // solver.SetPrecOperator(MLPrec);
     solver.SetAztecOption(AZ_kspace, 250);
-    solver.SetAztecOption(AZ_precond, AZ_none);
+    // solver.SetAztecOption(AZ_precond, AZ_none);
     solver.SetAztecOption(AZ_solver, AZ_gmres_condnum);
     solver.Iterate(1000, 1e-14);
     // delete MLPrec;
