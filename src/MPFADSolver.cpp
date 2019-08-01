@@ -307,16 +307,16 @@ void MPFADSolver::node_treatment (EntityHandle node, int id_left, int id_right,
     else if (std::find(this->neumann_nodes.begin(), this->neumann_nodes.end(), node) != this->neumann_nodes.end()) {
         double neu_term = this->weights[node][node], neumann_term;
         neumann_term = rhs*neu_term;
-        b.SumIntoGlobalValues(1, &neumann_term, &id_left);
-        neumann_term = -rhs*neu_term;
         b.SumIntoGlobalValues(1, &neumann_term, &id_right);
+        neumann_term = -rhs*neu_term;
+        b.SumIntoGlobalValues(1, &neumann_term, &id_left);
 
         for (std::map<EntityHandle, double>::iterator it = this->weights[node].begin(); it != this->weights[node].end(); ++it) {
             if (it->first == node) {
                 continue;
             }
             this->mb->tag_get_data(this->tags[global_id], &(it->first), 1, &vol_id);
-            col_value = it->second * rhs;
+            col_value = -it->second * rhs;
             A.InsertGlobalValues(id_right, 1, &col_value, &vol_id); col_value *= -1;
             A.InsertGlobalValues(id_left, 1, &col_value, &vol_id);
         }
@@ -324,7 +324,7 @@ void MPFADSolver::node_treatment (EntityHandle node, int id_left, int id_right,
     else if (std::find(this->internal_nodes.begin(), this->internal_nodes.end(), node) != this->internal_nodes.end()) {
         for (std::map<EntityHandle, double>::iterator it = this->weights[node].begin(); it != this->weights[node].end(); ++it) {
             this->mb->tag_get_data(this->tags[global_id], &(it->first), 1, &vol_id);
-            col_value = it->second * rhs;
+            col_value = -it->second * rhs;
             A.InsertGlobalValues(id_right, 1, &col_value, &vol_id); col_value *= -1;
             A.InsertGlobalValues(id_left, 1, &col_value, &vol_id);
         }
