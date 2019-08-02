@@ -53,7 +53,7 @@ private:
     double get_csi (EntityHandle face, EntityHandle volume);
     double get_neta (EntityHandle node, EntityHandle volume, EntityHandle face);
     double get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle face);
-    double get_flux_term (double v1[3], double k[9], double v2[3], double face_area);
+    double get_flux_term (double v1[3], double k[9], double v2[3]);
 };
 
 #endif

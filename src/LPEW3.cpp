@@ -203,7 +203,7 @@ double LPEW3::get_csi (EntityHandle face, EntityHandle volume) {
     std::copy(vol_centroid, vol_centroid + 3, sub_vol + 9);
     tetra_vol = geoutils::tetra_volume(sub_vol);
 
-    csi = this->get_flux_term(n_i, k, n_i, 1.0) / tetra_vol;
+    csi = this->get_flux_term(n_i, k, n_i) / tetra_vol;
 
     return csi;
 }
@@ -234,7 +234,7 @@ double LPEW3::get_neta (EntityHandle node, EntityHandle volume, EntityHandle fac
     tetra_vol = geoutils::tetra_volume(vol_nodes_coords);
 
     this->mb->tag_get_data(this->permeability_tag, &volume, 1, &k);
-    neta = this->get_flux_term(n_out, k, n_i, 1.0) / tetra_vol;
+    neta = this->get_flux_term(n_out, k, n_i) / tetra_vol;
 
     return neta;
 }
@@ -274,7 +274,7 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
         geoutils::normal_vector(node_coords, aux_node_coords, vol_centroid, ref_node_coords, n_int);
         geoutils::normal_vector(face_nodes_coords, ref_node_i_coords, n_i);
 
-        lambda_sum += this->get_flux_term(n_i, k, n_int, 1.0) / tetra_vol;
+        lambda_sum += this->get_flux_term(n_i, k, n_int) / tetra_vol;
 
         vol_nodes.clear();
         ref_node_i.clear();
@@ -283,11 +283,11 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
     return lambda_sum;
 }
 
-double LPEW3::get_flux_term (double v1[3], double k[9], double v2[3], double face_area) {
+double LPEW3::get_flux_term (double v1[3], double k[9], double v2[3]) {
     double flux_term = 0.0, temp[3] = {0.0, 0.0, 0.0};
     // <<v1, K>, v2> = trans(trans(v1)*K)*v2
     cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, 1, 3, 3, 1.0, &v1[0], 1, &k[0], 3, 1.0, &temp[0], 3);
-    flux_term = cblas_ddot(3, &temp[0], 1, &v2[0], 1) / face_area;
+    flux_term = cblas_ddot(3, &temp[0], 1, &v2[0], 1);
     return flux_term;
 }
 

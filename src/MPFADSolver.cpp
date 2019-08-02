@@ -22,7 +22,6 @@ void MPFADSolver::run () {
 	*/
 
     ErrorCode rval;
-    clock_t ts;
     int rank = this->pcomm->proc_config().proc_rank();
 
     // Get all volumes in the mesh and exchange those shared with
@@ -79,11 +78,7 @@ void MPFADSolver::run () {
     Epetra_Vector b (row_map);
     Epetra_Vector X (row_map);
 
-    printf("<%d> Matrix assembly...\n", rank);
-    ts = clock();
     this->assemble_matrix(A, b, volumes, faces, nodes);
-    ts = clock() - ts;
-    printf("<%d> Done. Time elapsed: %f\n", rank, ((double) ts)/CLOCKS_PER_SEC);
     A.FillComplete();
 
     Epetra_LinearProblem linear_problem (&A, &X, &b);
@@ -107,11 +102,7 @@ void MPFADSolver::run () {
     solver.Iterate(1000, 1e-14);
     // delete MLPrec;
 
-    printf("<%d> Setting pressure...\n", rank);
-    ts = clock();
     this->set_pressure_tags(X, volumes);
-    ts = clock() - ts;
-    printf("<%d> Done. Time elapsed: %f\n", rank, ((double) ts)/CLOCKS_PER_SEC);
 
     free(gids);
 }
@@ -223,25 +214,30 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     this->internal_nodes = intersect(this->internal_nodes, nodes);
 
     LPEW3 interpolation_method (this->mb);
-    cout << "Initializing tags for LPEW3" << endl;
+    clock_t ts;
+
     interpolation_method.init_tags();
 
-    cout << "Interpolating internal nodes" << endl;
+    printf("Interpolating internal nodes\n");
+    ts = clock();
     for (Range::iterator it = this->internal_nodes.begin(); it != this->internal_nodes.end(); ++it) {
         interpolation_method.interpolate(*it, false, this->weights[*it]);
     }
-    cout << "Done" << endl;
-    cout << "Interpolating neumann nodes" << endl;
+    printf("Done\n");
+    printf("Interpolating neumann nodes\n");
     for (Range::iterator it = this->neumann_nodes.begin(); it != this->neumann_nodes.end(); ++it) {
         interpolation_method.interpolate(*it, true, this->weights[*it]);
     }
-    cout << "Done" << endl;
+    ts = clock() - ts;
+    printf("Done. Time elapsed: %lf\n", ((double) ts) / CLOCKS_PER_SEC);
 
     // Check source terms and assign their values straight to the
     // right hand vector.
     double *source_terms = (double*) calloc(volumes.size(), sizeof(double));
     int *volumes_ids = (int*) calloc(volumes.size(), sizeof(int));
 
+    ts = clock();
+    printf("Assembling matrix\n");
     this->mb->tag_get_data(this->tags[source], volumes, source_terms);
     this->mb->tag_get_data(this->tags[global_id], volumes, volumes_ids);
     b.SumIntoGlobalValues(volumes.size(), source_terms, volumes_ids);
@@ -249,6 +245,8 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     this->visit_neumann_faces(A, b, neumann_faces);
     this->visit_dirichlet_faces(A, b, dirichlet_faces);
     this->visit_internal_faces(A, b, internal_faces);
+    ts = clock() - ts;
+    printf("Done. Time elapsed: %lf\n", ((double) ts) / CLOCKS_PER_SEC);
 }
 
 void MPFADSolver::set_pressure_tags (Epetra_Vector& X, Range& volumes) {
