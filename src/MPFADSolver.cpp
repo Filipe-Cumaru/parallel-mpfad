@@ -371,9 +371,9 @@ void MPFADSolver::visit_dirichlet_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, 
         this->mb->tag_get_data(this->tags[dirichlet], face_vertices, &node_pressure);
 
         // Dividing vertices coordinate array into three points.
-        i[0] = vert_coords[0]; i[1] = vert_coords[1]; i[2] = vert_coords[2];
-        j[0] = vert_coords[3]; j[1] = vert_coords[4]; j[2] = vert_coords[5];
-        k[0] = vert_coords[6]; k[1] = vert_coords[7]; k[2] = vert_coords[8];
+        std::copy(vert_coords, vert_coords + 3, i);
+        std::copy(vert_coords + 3, vert_coords + 6, j);
+        std::copy(vert_coords + 6, vert_coords + 9, k);
 
         // Retrieving left volume centroid.
         EntityHandle left_volume = vols_sharing_face[0];
@@ -470,9 +470,9 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         this->mtu->get_bridge_adjacencies(*it, 2, 3, vols_sharing_face);
 
         // Dividing vertices coordinate array into three points.
-        i[0] = vert_coords[0]; i[1] = vert_coords[1]; i[2] = vert_coords[2];
-        j[0] = vert_coords[3]; j[1] = vert_coords[4]; j[2] = vert_coords[5];
-        k[0] = vert_coords[6]; k[1] = vert_coords[7]; k[2] = vert_coords[8];
+        std::copy(vert_coords, vert_coords + 3, i);
+        std::copy(vert_coords + 3, vert_coords + 6, j);
+        std::copy(vert_coords + 6, vert_coords + 9, k);
 
         EntityHandle left_volume = vols_sharing_face[0], right_volume = vols_sharing_face[1];
         this->mb->tag_get_data(this->tags[centroid], &left_volume, 1, &l);
