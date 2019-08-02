@@ -6,6 +6,13 @@ using namespace moab;
 // NOTE: When implementing super class, remember to add a constructor that
 // accepts a value for tau.
 
+std::map<std::tuple<EntityHandle, EntityHandle, EntityHandle>, double> neta_mem;
+std::map<std::tuple<EntityHandle, EntityHandle, EntityHandle>, double> lambda_mem;
+std::map<std::tuple<EntityHandle, EntityHandle, EntityHandle>, double> phi_mem;
+std::map<std::tuple<EntityHandle, EntityHandle, EntityHandle>, double> psi_sum_mem;
+std::map<std::tuple<EntityHandle, EntityHandle>, double> sigma_mem;
+std::map<std::tuple<EntityHandle, EntityHandle>, double> csi_mem;
+
 LPEW3::LPEW3 () : mb (new Core()),
                 mtu (new MeshTopoUtil(mb)),
                 tau (0.0) {}
@@ -103,6 +110,11 @@ double LPEW3::get_psi_sum (EntityHandle node, EntityHandle volume, EntityHandle 
         a_face_nodes, other_node;
     double psi_sum = 0.0, lambda1 = 0.0, lambda2 = 0.0, neta = 0.0, sigma = 0.0;
 
+    std::tuple<EntityHandle, EntityHandle, EntityHandle> key (node, volume, face);
+    if (psi_sum_mem.find(key) != psi_sum_mem.end()) {
+        return psi_sum_mem[key];
+    }
+
     this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
     this->mtu->get_bridge_adjacencies(volume, 3, 0, vol_nodes);
     aux_node = subtract(vol_nodes, face_nodes);
@@ -126,12 +138,19 @@ double LPEW3::get_psi_sum (EntityHandle node, EntityHandle volume, EntityHandle 
     sigma = this->get_sigma(node, volume);
     psi_sum /= sigma;
 
+    psi_sum_mem[key] = psi_sum;
+
     return psi_sum;
 }
 
 double LPEW3::get_phi (EntityHandle node, EntityHandle volume, EntityHandle face) {
     Range face_nodes, adj_faces, vol_faces, vol_nodes, aux_node, faces;
     double phi = 0.0, lambda_mult = 1.0, sigma = 1.0, neta = 0.0;
+
+    std::tuple<EntityHandle, EntityHandle, EntityHandle> key (node, volume, face);
+    if (phi_mem.find(key) != phi_mem.end()) {
+        return phi_mem[key];
+    }
 
     this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
     this->mtu->get_bridge_adjacencies(volume, 3, 0, vol_nodes);
@@ -149,6 +168,8 @@ double LPEW3::get_phi (EntityHandle node, EntityHandle volume, EntityHandle face
 
     phi = lambda_mult * neta / sigma;
 
+    phi_mem[key] = phi;
+
     return phi;
 }
 
@@ -159,6 +180,11 @@ double LPEW3::get_sigma (EntityHandle node, EntityHandle volume) {
         aux_vector[9], count = 0.0, clock = 0.0;
     bool spin = false;
     int index = 0;
+
+    std::tuple<EntityHandle, EntityHandle> key (node, volume);
+    if (sigma_mem.find(key) != sigma_mem.end()) {
+        return sigma_mem[key];
+    }
 
     this->mtu->get_bridge_adjacencies(node, 0, 2, adj_faces);
     this->mtu->get_bridge_adjacencies(volume, 3, 2, vol_faces);
@@ -184,6 +210,8 @@ double LPEW3::get_sigma (EntityHandle node, EntityHandle volume) {
     }
     sigma = counter_clockwise + clockwise;
 
+    sigma_mem[key] = sigma;
+
     return sigma;
 }
 
@@ -191,6 +219,11 @@ double LPEW3::get_csi (EntityHandle face, EntityHandle volume) {
     Range face_nodes;
     double face_nodes_coords[9];
     double k[9], vol_centroid[3], n_i[3], sub_vol[12], csi = 0.0, tetra_vol = 0.0;
+
+    std::tuple<EntityHandle, EntityHandle> key (face, volume);
+    if (csi_mem.find(key) != csi_mem.end()) {
+        return csi_mem[key];
+    }
 
     this->mb->tag_get_data(this->permeability_tag, &volume, 1, &k);
     this->mb->tag_get_data(this->centroid_tag, &volume, 1, &vol_centroid);
@@ -205,6 +238,8 @@ double LPEW3::get_csi (EntityHandle face, EntityHandle volume) {
 
     csi = this->get_flux_term(n_i, k, n_i) / tetra_vol;
 
+    csi_mem[key] = csi;
+
     return csi;
 }
 
@@ -216,6 +251,11 @@ double LPEW3::get_neta (EntityHandle node, EntityHandle volume, EntityHandle fac
     double node_coords[9];
     double ref_node_coords[3];
     double k[9], n_out[3], n_i[3], tetra_vol = 0.0, neta = 0.0;
+
+    std::tuple<EntityHandle, EntityHandle, EntityHandle> key (node, volume, face);
+    if (neta_mem.find(key) != neta_mem.end()) {
+        return neta_mem[key];
+    }
 
     this->mtu->get_bridge_adjacencies(volume, 3, 0, vol_nodes);
     this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
@@ -235,6 +275,7 @@ double LPEW3::get_neta (EntityHandle node, EntityHandle volume, EntityHandle fac
 
     this->mb->tag_get_data(this->permeability_tag, &volume, 1, &k);
     neta = this->get_flux_term(n_out, k, n_i) / tetra_vol;
+    neta_mem[key] = neta;
 
     return neta;
 }
@@ -245,6 +286,11 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
         node_coords[3], ref_node_i_coords[3];
     double lambda_sum = 0.0, tetra_vol = 0.0, k[9], vol_centroid[3], sub_vol[12],
         n_int[3], n_i[3];
+
+    std::tuple<EntityHandle, EntityHandle, EntityHandle> key (node, aux_node, face);
+    if (lambda_mem.find(key) != lambda_mem.end()) {
+        return lambda_mem[key];
+    }
 
     this->mtu->get_bridge_adjacencies(face, 2, 3, adj_vols);
     this->mtu->get_bridge_adjacencies(face, 2, 0, face_nodes);
@@ -279,6 +325,7 @@ double LPEW3::get_lambda (EntityHandle node, EntityHandle aux_node, EntityHandle
         vol_nodes.clear();
         ref_node_i.clear();
     }
+    lambda_mem[key] = lambda_sum;
 
     return lambda_sum;
 }
