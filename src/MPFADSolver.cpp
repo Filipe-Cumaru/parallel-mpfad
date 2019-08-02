@@ -230,26 +230,21 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
     for (Range::iterator it = this->internal_nodes.begin(); it != this->internal_nodes.end(); ++it) {
         interpolation_method.interpolate(*it, false, this->weights[*it]);
     }
+    cout << "Done" << endl;
     cout << "Interpolating neumann nodes" << endl;
     for (Range::iterator it = this->neumann_nodes.begin(); it != this->neumann_nodes.end(); ++it) {
         interpolation_method.interpolate(*it, true, this->weights[*it]);
     }
+    cout << "Done" << endl;
 
     // Check source terms and assign their values straight to the
     // right hand vector.
-    Range source_volumes;
-    double source_term = 0.0;
-    int volume_id = -1;
-    rval = this->mb->get_entities_by_type_and_tag(0, MBTET,
-                    &this->tags[source], NULL, 1, source_volumes);
-    if (rval != MB_SUCCESS) {
-        throw runtime_error("Unable to get source terms");
-    }
-    for (Range::iterator it = source_volumes.begin(); it != source_volumes.end(); ++it) {
-        this->mb->tag_get_data(this->tags[source], &(*it), 1, &source_term);
-        this->mb->tag_get_data(this->tags[global_id], &(*it), 1, &volume_id);
-        b.SumIntoGlobalValues(1, &source_term, &volume_id);
-    }
+    double *source_terms = (double*) calloc(volumes.size(), sizeof(double));
+    int *volumes_ids = (int*) calloc(volumes.size(), sizeof(int));
+
+    this->mb->tag_get_data(this->tags[source], volumes, source_terms);
+    this->mb->tag_get_data(this->tags[global_id], volumes, volumes_ids);
+    b.SumIntoGlobalValues(volumes.size(), source_terms, volumes_ids);
 
     this->visit_neumann_faces(A, b, neumann_faces);
     this->visit_dirichlet_faces(A, b, dirichlet_faces);
