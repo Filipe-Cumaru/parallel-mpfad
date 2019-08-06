@@ -104,6 +104,10 @@ void MPFADSolver::run () {
 
     this->set_pressure_tags(X, volumes);
 
+    // A.Print(cout);
+    // cout << b << endl;
+    // cout << X << endl;
+
     free(gids);
 }
 
@@ -218,13 +222,13 @@ void MPFADSolver::assemble_matrix (Epetra_CrsMatrix& A, Epetra_Vector& b, Range 
 
     interpolation_method.init_tags();
 
-    printf("Interpolating internal nodes\n");
+    printf("Interpolating %ld internal nodes\n", this->internal_nodes.size());
     ts = clock();
     for (Range::iterator it = this->internal_nodes.begin(); it != this->internal_nodes.end(); ++it) {
         interpolation_method.interpolate(*it, false, this->weights[*it]);
     }
     printf("Done\n");
-    printf("Interpolating neumann nodes\n");
+    printf("Interpolating %ld neumann nodes\n", this->neumann_nodes.size());
     for (Range::iterator it = this->neumann_nodes.begin(); it != this->neumann_nodes.end(); ++it) {
         interpolation_method.interpolate(*it, true, this->weights[*it]);
     }
@@ -560,11 +564,16 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         d_JI = this->get_cross_diffusion_term(tan_JI, dist_LR, face_area, h_L, k_n_L, k_L_JI, h_R, k_n_R, k_R_JI, false);
         d_JK = this->get_cross_diffusion_term(tan_JK, dist_LR, face_area, h_L, k_n_L, k_L_JK, h_R, k_n_R, k_R_JK, false);
 
-        k_eq = (k_n_R * k_n_L / ((k_n_R * h_R) + (k_n_L * h_L))) * face_area;
+        k_eq = (k_n_R * k_n_L / ((k_n_R * h_L) + (k_n_L * h_R))) * face_area;
 
         int id_left, id_right;
         this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &id_left);
         this->mb->tag_get_data(this->tags[global_id], &right_volume, 1, &id_right);
+
+        // printf("(%d, %d) h_L = %lf\n", id_left, id_right, h_L);
+        // printf("(%d, %d) h_R = %lf\n", id_left, id_right, h_R);
+        // printf("(%d, %d) K_n_L = %lf\n", id_left, id_right, k_n_L);
+        // printf("(%d, %d) K_n_R = %lf\n", id_left, id_right, k_n_R);
 
         this->node_treatment(face_vertices[0], id_left, id_right, k_eq, 0.0, d_JK, A, b);
         this->node_treatment(face_vertices[1], id_left, id_right, k_eq, d_JI, -d_JK, A, b);
