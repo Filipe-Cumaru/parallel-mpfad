@@ -570,11 +570,6 @@ void MPFADSolver::visit_internal_faces (Epetra_CrsMatrix& A, Epetra_Vector& b, R
         this->mb->tag_get_data(this->tags[global_id], &left_volume, 1, &id_left);
         this->mb->tag_get_data(this->tags[global_id], &right_volume, 1, &id_right);
 
-        // printf("(%d, %d) h_L = %lf\n", id_left, id_right, h_L);
-        // printf("(%d, %d) h_R = %lf\n", id_left, id_right, h_R);
-        // printf("(%d, %d) K_n_L = %lf\n", id_left, id_right, k_n_L);
-        // printf("(%d, %d) K_n_R = %lf\n", id_left, id_right, k_n_R);
-
         this->node_treatment(face_vertices[0], id_left, id_right, k_eq, 0.0, d_JK, A, b);
         this->node_treatment(face_vertices[1], id_left, id_right, k_eq, d_JI, -d_JK, A, b);
         this->node_treatment(face_vertices[2], id_left, id_right, k_eq, -d_JI, 0.0, A, b);
