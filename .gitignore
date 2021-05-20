@@ -9,3 +9,4 @@ partial_results
 *.py
 main*
 __pycache__
+.devcontainer/
